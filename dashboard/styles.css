@@ -909,6 +909,76 @@ body::before {
     height: 280px;
 }
 
+/* Console Link */
+.console-link {
+    background: rgba(0, 255, 65, 0.08);
+    border-color: rgba(0, 255, 65, 0.2);
+    color: #00ff41;
+    text-decoration: none;
+}
+
+.console-link:hover {
+    background: rgba(0, 255, 65, 0.15);
+    border-color: rgba(0, 255, 65, 0.4);
+    box-shadow: 0 0 12px rgba(0, 255, 65, 0.15);
+}
+
+/* Expand Button */
+.expand-btn {
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.expand-btn:hover {
+    color: var(--accent-cyan);
+    background: var(--accent-cyan-dim);
+}
+
+/* ─── Fullscreen Modal ───────────────────────────────────── */
+.fullscreen-modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(6, 10, 19, 0.97);
+    backdrop-filter: blur(20px);
+    z-index: 300;
+    flex-direction: column;
+}
+
+.fullscreen-modal.active {
+    display: flex;
+}
+
+.fullscreen-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+}
+
+.fullscreen-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.fullscreen-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow: hidden;
+}
+
+.fullscreen-body canvas {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: var(--radius);
+}
+
 /* ─── Responsive ─────────────────────────────────────────── */
 @media (max-width: 1100px) {
     .charts-row {

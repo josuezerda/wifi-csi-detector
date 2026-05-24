@@ -1253,6 +1253,116 @@ function setupSlider(inputId, displayId, formatter) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Fullscreen Expand
+// ═══════════════════════════════════════════════════════════
+
+let fullscreenSource = null;
+let fullscreenCanvas = null;
+let fullscreenAnimFrame = null;
+
+const expandTitles = {
+    'room-canvas': '🏠 Vista de Habitación',
+    'radar-canvas': '📡 Radar de Detección',
+    'amplitude-chart': '📊 Amplitud de Subportadoras',
+    'variance-chart': '📈 Varianza (Detección)',
+    'heatmap-canvas': '🌡️ Mapa de Calor — Subportadoras',
+};
+
+function initExpandButtons() {
+    document.querySelectorAll('.expand-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.dataset.target;
+            openFullscreen(targetId);
+        });
+    });
+
+    document.getElementById('btn-close-fullscreen').addEventListener('click', closeFullscreen);
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeFullscreen();
+    });
+}
+
+function openFullscreen(canvasId) {
+    const source = document.getElementById(canvasId);
+    if (!source) return;
+
+    fullscreenSource = source;
+    const modal = document.getElementById('fullscreen-modal');
+    const body = document.getElementById('fullscreen-body');
+    const title = document.getElementById('fullscreen-title');
+
+    title.textContent = expandTitles[canvasId] || 'Visualización';
+
+    // Create a fullscreen canvas
+    body.innerHTML = '';
+    fullscreenCanvas = document.createElement('canvas');
+    fullscreenCanvas.id = 'fullscreen-canvas';
+
+    const isChart = canvasId.includes('chart');
+
+    if (isChart) {
+        // For Chart.js: just make the card bigger
+        fullscreenCanvas.style.width = '95vw';
+        fullscreenCanvas.style.height = '85vh';
+    } else {
+        // For raw canvas: mirror at higher resolution
+        fullscreenCanvas.style.width = '90vw';
+        fullscreenCanvas.style.height = '85vh';
+    }
+
+    body.appendChild(fullscreenCanvas);
+    modal.classList.add('active');
+
+    if (!isChart) {
+        // Start mirroring loop for raw canvases
+        function mirrorLoop() {
+            if (!fullscreenCanvas || !modal.classList.contains('active')) return;
+
+            const w = fullscreenCanvas.clientWidth;
+            const h = fullscreenCanvas.clientHeight;
+            fullscreenCanvas.width = w;
+            fullscreenCanvas.height = h;
+
+            const ctx = fullscreenCanvas.getContext('2d');
+            ctx.imageSmoothingEnabled = canvasId !== 'heatmap-canvas';
+            ctx.drawImage(source, 0, 0, w, h);
+
+            fullscreenAnimFrame = requestAnimationFrame(mirrorLoop);
+        }
+        fullscreenAnimFrame = requestAnimationFrame(mirrorLoop);
+    } else {
+        // For charts, create a new Chart.js instance in fullscreen
+        const sourceChart = state.charts[canvasId === 'amplitude-chart' ? 'amplitude' : 'variance'];
+        if (sourceChart) {
+            fullscreenCanvas.width = window.innerWidth * 0.9;
+            fullscreenCanvas.height = window.innerHeight * 0.8;
+            const fsCtx = fullscreenCanvas.getContext('2d');
+
+            function chartMirror() {
+                if (!fullscreenCanvas || !modal.classList.contains('active')) return;
+                fsCtx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+                fsCtx.drawImage(source, 0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+                fullscreenAnimFrame = requestAnimationFrame(chartMirror);
+            }
+            fullscreenAnimFrame = requestAnimationFrame(chartMirror);
+        }
+    }
+}
+
+function closeFullscreen() {
+    const modal = document.getElementById('fullscreen-modal');
+    modal.classList.remove('active');
+
+    if (fullscreenAnimFrame) {
+        cancelAnimationFrame(fullscreenAnimFrame);
+        fullscreenAnimFrame = null;
+    }
+    fullscreenCanvas = null;
+    fullscreenSource = null;
+}
+
+// ═══════════════════════════════════════════════════════════
 // Export Data
 // ═══════════════════════════════════════════════════════════
 
@@ -1569,6 +1679,7 @@ function init() {
     initRoomView();
     initRadar();
     initSettings();
+    initExpandButtons();
     startFPSCounter();
     startVisualLoop();
 

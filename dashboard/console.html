@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi CSI — Live Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --green: #00ff41;
+            --cyan: #00e5ff;
+            --amber: #ffab00;
+            --red: #ff1744;
+            --dim: rgba(0,255,65,0.15);
+            --bg: #0a0e14;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--green);
+            font-family: 'JetBrains Mono', monospace;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Matrix rain background */
+        #matrix-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            opacity: 0.06;
+        }
+
+        /* Header */
+        .console-header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 40px;
+            background: rgba(10, 14, 20, 0.95);
+            border-bottom: 1px solid rgba(0,255,65,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+        }
+
+        .console-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .console-title .dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .console-title .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        .console-stats {
+            display: flex;
+            gap: 24px;
+            font-size: 10px;
+            color: rgba(0,255,65,0.5);
+        }
+
+        .console-stats span { display: flex; align-items: center; gap: 6px; }
+        .stat-live { color: var(--green); animation: blink 1s infinite; }
+
+        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* Main layout */
+        .console-body {
+            position: fixed;
+            top: 40px; left: 0; right: 0; bottom: 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 1px;
+            background: rgba(0,255,65,0.05);
+            z-index: 1;
+        }
+
+        .console-panel {
+            background: rgba(10, 14, 20, 0.95);
+            padding: 8px 12px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(0,255,65,0.1);
+            margin-bottom: 6px;
+            flex-shrink: 0;
+        }
+
+        .panel-title {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .panel-badge {
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--dim);
+            color: var(--green);
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Data stream panel */
+        .data-stream {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            overflow: hidden;
+        }
+
+        .data-line {
+            font-size: 10px;
+            line-height: 1.6;
+            white-space: nowrap;
+            animation: lineSlideIn 0.15s ease-out;
+            opacity: 0.85;
+        }
+
+        .data-line:last-child { opacity: 1; }
+
+        @keyframes lineSlideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .tag-time { color: rgba(0,255,65,0.4); }
+        .tag-type { color: var(--cyan); font-weight: 600; }
+        .tag-data { color: var(--green); }
+        .tag-key { color: var(--amber); }
+        .tag-value { color: #bb86fc; }
+        .tag-alert { color: var(--red); font-weight: 700; }
+        .tag-ok { color: #00e676; }
+        .tag-comment { color: rgba(0,255,65,0.3); font-style: italic; }
+        .tag-bracket { color: rgba(0,229,255,0.6); }
+        .tag-num { color: #ff80ab; }
+
+        /* Processing pipeline */
+        .pipeline-step {
+            font-size: 10px;
+            line-height: 1.8;
+            display: flex;
+            gap: 8px;
+        }
+
+        .pipeline-icon { flex-shrink: 0; }
+        .pipeline-text { flex: 1; }
+
+        .progress-bar {
+            height: 3px;
+            background: rgba(0,255,65,0.1);
+            border-radius: 2px;
+            margin: 4px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--green);
+            border-radius: 2px;
+            transition: width 0.3s;
+            box-shadow: 0 0 8px var(--green);
+        }
+
+        /* Detection visualization */
+        .detection-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 12px;
+        }
+
+        .detection-ascii {
+            font-size: 9px;
+            line-height: 1.2;
+            text-align: center;
+            transition: color 0.5s;
+        }
+
+        .detection-status {
+            font-size: 14px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .detection-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 16px;
+            font-size: 9px;
+        }
+
+        .detection-metrics .label { color: rgba(0,255,65,0.4); }
+        .detection-metrics .val { color: var(--green); text-align: right; font-weight: 600; }
+
+        /* Network panel */
+        .net-line {
+            font-size: 10px;
+            line-height: 1.7;
+        }
+
+        .net-arrow { color: var(--cyan); }
+        .net-url { color: var(--amber); }
+        .net-status-ok { color: #00e676; }
+        .net-status-err { color: var(--red); }
+        .net-bytes { color: rgba(0,255,65,0.5); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,255,65,0.2); border-radius: 2px; }
+
+        /* Scanline effect */
+        .console-body::after {
+            content: '';
+            position: fixed;
+            top: 40px; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 2px,
+                rgba(0,0,0,0.03) 2px,
+                rgba(0,0,0,0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-canvas"></canvas>
+
+    <div class="console-header">
+        <div class="console-title">
+            <div class="dots">
+                <div class="dot dot-red"></div>
+                <div class="dot dot-yellow"></div>
+                <div class="dot dot-green"></div>
+            </div>
+            <span>wifi-csi-detector — Live Console</span>
+        </div>
+        <div class="console-stats">
+            <span class="stat-live">● LIVE</span>
+            <span id="console-fps">FPS: 0</span>
+            <span id="console-frames">Frames: 0</span>
+            <span id="console-uptime">Uptime: 0:00</span>
+        </div>
+    </div>
+
+    <div class="console-body">
+        <!-- Panel 1: Raw CSI Data Stream -->
+        <div class="console-panel">
+            <div class="panel-header">
+                <span class="panel-title">📡 CSI Data Stream</span>
+                <span class="panel-badge" id="stream-badge">RECEIVING</span>
+            </div>
+            <div class="panel-content">
+                <div class="data-stream" id="data-stream"></div>
+            </div>
+        </div>
+
+        <!-- Panel 2: Processing Pipeline -->
+        <div class="console-panel">
+            <div class="panel-header">
+                <span class="panel-title">⚙️ Processing Pipeline</span>
+                <span class="panel-badge" id="pipeline-badge">ACTIVE</span>
+            </div>
+            <div class="panel-content">
+                <div class="data-stream" id="pipeline-stream"></div>
+            </div>
+        </div>
+
+        <!-- Panel 3: Detection Output -->
+        <div class="console-panel">
+            <div class="panel-header">
+                <span class="panel-title">🎯 Detection Engine</span>
+                <span class="panel-badge" id="detection-console-badge">MONITORING</span>
+            </div>
+            <div class="panel-content">
+                <div class="detection-display" id="detection-display"></div>
+            </div>
+        </div>
+
+        <!-- Panel 4: Network / DB Log -->
+        <div class="console-panel">
+            <div class="panel-header">
+                <span class="panel-title">🌐 Network & Database</span>
+                <span class="panel-badge" id="net-badge">CONNECTED</span>
+            </div>
+            <div class="panel-content">
+                <div class="data-stream" id="net-stream"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ═══ Matrix Rain ═══
+    (function initMatrix() {
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const chars = 'CSI_DATA01アイウエオカキクケコ∑∏∫≈≠∞⟨⟩⊕⊗';
+        const fontSize = 12;
+        const cols = Math.floor(canvas.width / fontSize);
+        const drops = Array(cols).fill(1);
+
+        function draw() {
+            ctx.fillStyle = 'rgba(10, 14, 20, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#00ff41';
+            ctx.font = `${fontSize}px JetBrains Mono`;
+
+            for (let i = 0; i < drops.length; i++) {
+                const char = chars[Math.floor(Math.random() * chars.length)];
+                ctx.fillText(char, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+        setInterval(draw, 50);
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+    })();
+
+    // ═══ Simulator (same as dashboard) ═══
+    class MiniSimulator {
+        constructor() {
+            this.n = 64; this.t = 0; this.state = 'empty'; this.stateT = 0;
+            this.states = ['empty','entering','moving','still','breathing','leaving'];
+            this.si = 0; this.dur = 6000 + Math.random()*6000;
+            this.base = Array.from({length:64}, (_,i) => 20 + 8*Math.exp(-2*((i/64*2-1)**2)) + (Math.random()-0.5)*3);
+            this.history = []; this.variance = 0; this.detCount = 0; this.frames = 0;
+            this.start = Date.now(); this.lastPresence = false;
+        }
+        _g() { return Math.sqrt(-2*Math.log(Math.random()))*Math.cos(2*Math.PI*Math.random()); }
+        tick() {
+            this.t++; this.frames++;
+            if (Date.now()-this.stateT > this.dur) {
+                this.si = (this.si+1) % this.states.length;
+                this.state = this.states[this.si]; this.stateT = Date.now();
+                this.dur = 3000 + Math.random()*8000;
+            }
+            const p = Math.min(1,(Date.now()-this.stateT)/this.dur);
+            const amps = this.base.map((b,i) => {
+                let pert = 0; const c=32, d=(i-c)/10;
+                if (this.state==='entering') pert = 6*p*Math.exp(-0.5*d*d);
+                else if (this.state==='moving') pert = 6*(0.8+0.2*Math.sin(this.t*0.3))*Math.exp(-0.5*((i-c+(Math.random()-0.5)*10)/10)**2)+this._g()*3;
+                else if (this.state==='still') pert = 3*Math.exp(-0.5*d*d)+this._g()*0.8;
+                else if (this.state==='breathing') pert = 2.5*Math.exp(-0.5*d*d)+2.5*Math.sin(this.t*0.2)*Math.exp(-0.5*(d/1.5)**2);
+                else if (this.state==='leaving') pert = 3*(1-p)*Math.exp(-0.5*d*d);
+                return Math.max(1,Math.min(50,b+this._g()*1.2+pert));
+            });
+            this.history.push(amps); if (this.history.length>50) this.history.shift();
+            if (this.history.length>3) {
+                let v=0;
+                for (let s=0;s<64;s++) { let sm=0,sq=0; this.history.forEach(r=>{sm+=r[s];sq+=r[s]*r[s];}); const n=this.history.length; v+=sq/n-(sm/n)**2; }
+                this.variance = 0.3*(v/64)+0.7*this.variance;
+            }
+            const presence = this.variance > 9.6;
+            const movement = this.variance > 20;
+            if (presence && !this.lastPresence) this.detCount++;
+            this.lastPresence = presence;
+            return { amps, variance: this.variance, presence, movement, state: this.state,
+                rssi: -55+(presence?-5:0)+this._g()*2, frames: this.frames, detections: this.detCount,
+                uptime: (Date.now()-this.start)/1000 };
+        }
+    }
+
+    const sim = new MiniSimulator();
+    let frameCount = 0, fpsCount = 0, currentFps = 0;
+
+    // ═══ FPS ═══
+    setInterval(() => { currentFps = fpsCount; fpsCount = 0; }, 1000);
+
+    // ═══ Data Stream Panel ═══
+    function addDataLine(data) {
+        const el = document.getElementById('data-stream');
+        const ts = new Date().toLocaleTimeString('es-AR',{hour12:false});
+        const ampStr = data.amps.slice(0,8).map(a=>a.toFixed(1)).join(', ');
+
+        const lines = [
+            `<span class="tag-time">[${ts}]</span> <span class="tag-type">CSI_DATA</span> <span class="tag-bracket">{</span>`,
+            `  <span class="tag-key">"rssi"</span>: <span class="tag-num">${data.rssi.toFixed(0)}</span>, <span class="tag-key">"channel"</span>: <span class="tag-num">6</span>, <span class="tag-key">"bw"</span>: <span class="tag-num">20</span>,`,
+            `  <span class="tag-key">"amplitudes"</span>: <span class="tag-bracket">[</span><span class="tag-num">${ampStr}</span>, ...<span class="tag-bracket">]</span> <span class="tag-comment">// ${data.amps.length} subcarriers</span>`,
+            `  <span class="tag-key">"variance"</span>: <span class="tag-num">${data.variance.toFixed(3)}</span>, <span class="tag-key">"frame"</span>: <span class="tag-num">${data.frames}</span>`,
+            `<span class="tag-bracket">}</span>`,
+        ];
+
+        lines.forEach(l => {
+            const div = document.createElement('div');
+            div.className = 'data-line';
+            div.innerHTML = l;
+            el.appendChild(div);
+        });
+
+        while (el.children.length > 80) el.removeChild(el.firstChild);
+        el.scrollTop = el.scrollHeight;
+    }
+
+    // ═══ Pipeline Panel ═══
+    const pipelineSteps = [
+        { icon: '📥', text: 'Serial.read() → buffer[{n}]', key: 'read' },
+        { icon: '🔍', text: 'parse_csi_line() → {n} subcarriers extracted', key: 'parse' },
+        { icon: '📊', text: 'compute_amplitude(I, Q) → √(I²+Q²)', key: 'amp' },
+        { icon: '🧮', text: 'variance_filter(window={w}) → σ² = {v}', key: 'var' },
+        { icon: '🧠', text: 'detect_presence(σ² > θ) → {result}', key: 'detect' },
+        { icon: '💾', text: 'db.insert({{frame: {f}, presence: {p}, ts: {ts}}})', key: 'db' },
+        { icon: '📡', text: 'ws.broadcast(clients={c}) → {bytes}B sent', key: 'ws' },
+    ];
+
+    function addPipelineLine(data) {
+        const el = document.getElementById('pipeline-stream');
+        const ts = new Date().toLocaleTimeString('es-AR',{hour12:false});
+
+        pipelineSteps.forEach((step, i) => {
+            setTimeout(() => {
+                let text = step.text
+                    .replace('{n}', data.amps.length)
+                    .replace('{w}', '50')
+                    .replace('{v}', data.variance.toFixed(4))
+                    .replace('{result}', data.presence ? '<span class="tag-alert">TRUE</span>' : '<span class="tag-ok">false</span>')
+                    .replace('{f}', data.frames)
+                    .replace('{p}', data.presence)
+                    .replace('{ts}', ts)
+                    .replace('{c}', Math.floor(1+Math.random()*3))
+                    .replace('{bytes}', (1200+Math.floor(Math.random()*800)));
+
+                const div = document.createElement('div');
+                div.className = 'data-line';
+                div.innerHTML = `<span class="tag-time">[${ts}]</span> ${step.icon} <span class="tag-data">${text}</span>`;
+                el.appendChild(div);
+
+                while (el.children.length > 60) el.removeChild(el.firstChild);
+                el.scrollTop = el.scrollHeight;
+            }, i * 60);
+        });
+    }
+
+    // ═══ Detection Panel ═══
+    const asciiEmpty = `
+    ╔═══════════════════╗
+    ║                   ║
+    ║   ╭─── WiFi ───╮  ║
+    ║   │  ≋≋≋≋≋≋≋≋  │  ║
+    ║   │  ≋≋≋≋≋≋≋≋  │  ║
+    ║   │  ≋≋≋≋≋≋≋≋  │  ║
+    ║   ╰────────────╯  ║
+    ║    ÁREA LIMPIA     ║
+    ╚═══════════════════╝`;
+
+    const asciiPresence = `
+    ╔═══════════════════╗
+    ║                   ║
+    ║   ╭─── WiFi ───╮  ║
+    ║   │  ≋≋ ◉ ≋≋  │  ║
+    ║   │  ≋ /█\\ ≋  │  ║
+    ║   │  ≋ / \\ ≋  │  ║
+    ║   ╰────────────╯  ║
+    ║  ⚠ DETECTADO ⚠    ║
+    ╚═══════════════════╝`;
+
+    const asciiMovement = `
+    ╔═══════════════════╗
+    ║     ⚡ ⚡ ⚡       ║
+    ║   ╭─── WiFi ───╮  ║
+    ║   │ ≋≋ ◉  ≋≋  │  ║
+    ║   │ ≋ /█\\→ ≋  │  ║
+    ║   │ ≋ / \\ ≋≋  │  ║
+    ║   ╰────────────╯  ║
+    ║  🔴 MOVIMIENTO 🔴  ║
+    ╚═══════════════════╝`;
+
+    function updateDetectionPanel(data) {
+        const el = document.getElementById('detection-display');
+        const badge = document.getElementById('detection-console-badge');
+
+        let ascii, statusColor, statusText;
+        if (data.movement) {
+            ascii = asciiMovement; statusColor = '#ffab00'; statusText = '⚡ MOVIMIENTO ACTIVO';
+            badge.textContent = '⚠ ALERT'; badge.style.background = 'rgba(255,23,68,0.2)'; badge.style.color = '#ff1744';
+        } else if (data.presence) {
+            ascii = asciiPresence; statusColor = '#ff1744'; statusText = '● PRESENCIA DETECTADA';
+            badge.textContent = 'DETECTED'; badge.style.background = 'rgba(255,23,68,0.15)'; badge.style.color = '#ff1744';
+        } else {
+            ascii = asciiEmpty; statusColor = '#00ff41'; statusText = '○ SIN PRESENCIA';
+            badge.textContent = 'CLEAR'; badge.style.background = 'rgba(0,255,65,0.1)'; badge.style.color = '#00ff41';
+        }
+
+        el.innerHTML = `
+            <pre class="detection-ascii" style="color:${statusColor}">${ascii}</pre>
+            <div class="detection-status" style="color:${statusColor}">${statusText}</div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100,data.variance*3)}%;background:${statusColor}"></div></div>
+            <div class="detection-metrics">
+                <span class="label">Varianza:</span><span class="val" style="color:${statusColor}">${data.variance.toFixed(2)}</span>
+                <span class="label">RSSI:</span><span class="val">${data.rssi.toFixed(0)} dBm</span>
+                <span class="label">Detecciones:</span><span class="val">${data.detections}</span>
+                <span class="label">Estado:</span><span class="val">${data.state}</span>
+            </div>
+        `;
+    }
+
+    // ═══ Network Panel ═══
+    const netActions = [
+        (d) => `<span class="net-arrow">→</span> <span class="tag-type">POST</span> <span class="net-url">/api/v1/csi/frames</span> <span class="net-status-ok">201</span> <span class="net-bytes">${1200+Math.floor(Math.random()*600)}B ${(2+Math.random()*5).toFixed(0)}ms</span>`,
+        (d) => `<span class="net-arrow">→</span> <span class="tag-type">WS</span> <span class="net-url">ws://sensor.local:8765</span> <span class="net-status-ok">SEND</span> <span class="net-bytes">frame #${d.frames}</span>`,
+        (d) => `<span class="net-arrow">←</span> <span class="tag-type">ACK</span> <span class="net-url">client_${Math.floor(Math.random()*3+1)}</span> <span class="net-status-ok">OK</span> <span class="net-bytes">${(1+Math.random()*2).toFixed(0)}ms</span>`,
+        (d) => `<span class="net-arrow">→</span> <span class="tag-type">INSERT</span> <span class="net-url">mongodb://db/csi_readings</span> <span class="net-status-ok">OK</span> <span class="net-bytes">doc_${Date.now().toString(36)}</span>`,
+        (d) => `<span class="net-arrow">→</span> <span class="tag-type">PUSH</span> <span class="net-url">redis://cache/latest_frame</span> <span class="net-status-ok">SET</span> <span class="net-bytes">TTL=30s</span>`,
+        (d) => d.presence ? `<span class="net-arrow">→</span> <span class="tag-type">ALERT</span> <span class="net-url">webhook/presence</span> <span class="tag-alert">TRIGGER</span> <span class="net-bytes">σ²=${d.variance.toFixed(1)}</span>` : `<span class="net-arrow">•</span> <span class="tag-type">HEARTBEAT</span> <span class="net-url">health/check</span> <span class="net-status-ok">200</span> <span class="net-bytes">all systems nominal</span>`,
+    ];
+
+    function addNetLine(data) {
+        const el = document.getElementById('net-stream');
+        const ts = new Date().toLocaleTimeString('es-AR',{hour12:false});
+
+        const numLines = 2 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < numLines; i++) {
+            const action = netActions[Math.floor(Math.random()*netActions.length)];
+            const div = document.createElement('div');
+            div.className = 'data-line net-line';
+            div.innerHTML = `<span class="tag-time">[${ts}]</span> ${action(data)}`;
+            el.appendChild(div);
+        }
+
+        while (el.children.length > 60) el.removeChild(el.firstChild);
+        el.scrollTop = el.scrollHeight;
+    }
+
+    // ═══ Main Loop ═══
+    function update() {
+        const data = sim.tick();
+        frameCount++;
+        fpsCount++;
+
+        addDataLine(data);
+        if (frameCount % 3 === 0) addPipelineLine(data);
+        updateDetectionPanel(data);
+        if (frameCount % 2 === 0) addNetLine(data);
+
+        // Header stats
+        document.getElementById('console-fps').textContent = `FPS: ${currentFps}`;
+        document.getElementById('console-frames').textContent = `Frames: ${data.frames}`;
+        const m = Math.floor(data.uptime/60), s = Math.floor(data.uptime%60);
+        document.getElementById('console-uptime').textContent = `Uptime: ${m}:${s.toString().padStart(2,'0')}`;
+    }
+
+    setInterval(update, 100);
+    </script>
+</body>
+</html>

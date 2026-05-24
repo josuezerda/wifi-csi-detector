@@ -49,6 +49,11 @@
                     <span class="mode-icon">📡</span> Live
                 </button>
             </div>
+            <a href="console.html" target="_blank" class="icon-btn console-link" title="Live Console">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+            </a>
             <button class="icon-btn" id="btn-settings" title="Configuración">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
@@ -142,6 +147,7 @@
                     <h3>🏠 Vista de Habitación</h3>
                     <div class="card-actions">
                         <span class="badge" id="room-activity-badge">Monitoreando</span>
+                        <button class="icon-btn small expand-btn" data-target="room-canvas" title="Expandir">⛶</button>
                     </div>
                 </div>
                 <div class="room-container" id="room-container">
@@ -155,6 +161,7 @@
                     <h3>📡 Radar de Detección</h3>
                     <div class="card-actions">
                         <span class="badge" id="radar-range-badge">Rango: 5m</span>
+                        <button class="icon-btn small expand-btn" data-target="radar-canvas" title="Expandir">⛶</button>
                     </div>
                 </div>
                 <div class="radar-container">
@@ -171,6 +178,7 @@
                     <h3>📊 Amplitud de Subportadoras</h3>
                     <div class="card-actions">
                         <span class="badge" id="subcarrier-count">64 subportadoras</span>
+                        <button class="icon-btn small expand-btn" data-target="amplitude-chart" title="Expandir">⛶</button>
                     </div>
                 </div>
                 <div class="chart-container">
@@ -184,6 +192,7 @@
                     <h3>📈 Varianza (Detección)</h3>
                     <div class="card-actions">
                         <span class="badge presence-badge" id="detection-badge">Monitoreando</span>
+                        <button class="icon-btn small expand-btn" data-target="variance-chart" title="Expandir">⛶</button>
                     </div>
                 </div>
                 <div class="chart-container">
@@ -200,6 +209,7 @@
                     <h3>🌡️ Mapa de Calor — Subportadoras</h3>
                     <div class="card-actions">
                         <span class="badge" id="heatmap-info">Tiempo ➡️</span>
+                        <button class="icon-btn small expand-btn" data-target="heatmap-canvas" title="Expandir">⛶</button>
                     </div>
                 </div>
                 <div class="heatmap-container">
@@ -335,6 +345,19 @@
 
     <!-- ─── Overlay for Settings ───────────────────────── -->
     <div class="settings-overlay" id="settings-overlay"></div>
+
+    <!-- ─── Fullscreen Modal ───────────────────────────── -->
+    <div class="fullscreen-modal" id="fullscreen-modal">
+        <div class="fullscreen-header">
+            <h3 id="fullscreen-title">Visualización</h3>
+            <button class="icon-btn" id="btn-close-fullscreen" title="Cerrar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <div class="fullscreen-body" id="fullscreen-body"></div>
+    </div>
 
     <!-- ─── Scripts ────────────────────────────────────── -->
     <script src="app.js"></script>
