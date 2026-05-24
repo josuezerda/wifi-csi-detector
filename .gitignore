@@ -24,6 +24,7 @@ Thumbs.db
 # Data exports
 *.json
 !package.json
+!vercel.json
 
 # ESP-IDF build
 build/

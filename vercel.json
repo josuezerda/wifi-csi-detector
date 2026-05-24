@@ -1,0 +1,6 @@
+{
+    "installCommand": "echo 'No install needed'",
+    "buildCommand": "mkdir -p dist && cp -r dashboard/* dist/",
+    "outputDirectory": "dist",
+    "framework": null
+}
