@@ -325,7 +325,7 @@ def get_local_ip():
 
 
 def heartbeat_loop(cameras_count_fn):
-    """Thread loop que envía heartbeats cada 30 segundos."""
+    """Thread loop que envía heartbeats cada 30 segundos a Supabase."""
     while running:
         try:
             payload = {
@@ -335,11 +335,19 @@ def heartbeat_loop(cameras_count_fn):
                 "uptime_seconds": get_uptime(),
                 "ip_address": get_local_ip(),
                 "version": "1.0.0",
+                "last_seen": datetime.now().isoformat(),
+            }
+            
+            headers = {
+                **supabase_headers(),
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates,return=minimal",
             }
             
             requests.post(
-                f"{API_URL}/api/heartbeat",
+                f"{SUPABASE_URL}/rest/v1/home_heartbeats",
                 json=payload,
+                headers=headers,
                 timeout=10,
             )
         except Exception as e:

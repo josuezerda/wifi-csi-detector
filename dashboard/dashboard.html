@@ -55,6 +55,17 @@
                 <span>Configuración</span>
             </button>
         </div>
+        <!-- RPi Status Widget -->
+        <div class="rpi-status-widget" id="rpi-status-widget">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--accent-red-dim);border-radius:10px;margin:0 12px 8px">
+                <span class="rpi-dot" id="rpi-dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent-red);flex-shrink:0"></span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2" id="rpi-icon"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+                <div style="flex:1;min-width:0">
+                    <p style="font-size:0.7rem;font-weight:600;color:var(--accent-red)" id="rpi-status-text">RPi5 — Offline</p>
+                    <p style="font-size:0.55rem;color:var(--text-dimmed)" id="rpi-status-detail">Sin conexión</p>
+                </div>
+            </div>
+        </div>
         <div class="sidebar-footer">
             <div class="sidebar-user">
                 <div class="user-avatar">SA</div>
@@ -514,9 +525,23 @@
             <!-- Alertas WhatsApp -->
             <div class="settings-section" id="settings-whatsapp">
                 <h4>🔔 Alertas WhatsApp</h4>
+                <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:14px">
+                    <p style="font-size:0.65rem;color:var(--text-muted)">📋 Estos datos van en las variables de entorno del RPi. Acá los podés ver/copiar para configurarlos.</p>
+                </div>
+                <div class="setting-item">
+                    <label>WhatsApp Number ID (Meta Cloud API)</label>
+                    <input type="text" id="setting-whatsapp-number-id" class="form-input" placeholder="Ej: 100200300400500">
+                    <p class="setting-help">Lo sacás de Meta Business → WhatsApp → API Setup → Phone number ID</p>
+                </div>
+                <div class="setting-item">
+                    <label>WhatsApp Token</label>
+                    <input type="password" id="setting-whatsapp-token" class="form-input" placeholder="Bearer token de Meta Cloud API">
+                    <p class="setting-help">Token temporal o permanente de la API de WhatsApp Business</p>
+                </div>
                 <div class="setting-item">
                     <label>Teléfonos para alertas (uno por línea)</label>
                     <textarea id="setting-alert-phones" class="form-input" rows="3" placeholder="5493855381804" style="font-family:'JetBrains Mono',monospace;resize:vertical"></textarea>
+                    <p class="setting-help">Número con código de país, sin + ni espacios</p>
                 </div>
                 <div class="setting-item" style="display:flex;justify-content:space-between;align-items:center">
                     <div><strong style="font-size:0.85rem;color:var(--text-primary)">Persona desconocida</strong><p class="setting-help">Alertar cuando se detecta alguien no autorizado</p></div>

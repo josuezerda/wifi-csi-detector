@@ -1696,6 +1696,10 @@ function init() {
 function initSupabaseFeatures() {
     if (!window._supabase) return;
 
+    // RPi heartbeat polling
+    pollRpiHeartbeat();
+    setInterval(pollRpiHeartbeat, 30000);
+
     // Cameras page
     loadCameras();
     const addCamBtn = document.getElementById('btn-add-camera');
@@ -2060,6 +2064,12 @@ async function loadSettingsConfig() {
     const phonesEl = document.getElementById('setting-alert-phones');
     if (phonesEl && data.alert_phones) phonesEl.value = data.alert_phones.join('\n');
 
+    // WhatsApp API tokens
+    const numIdEl = document.getElementById('setting-whatsapp-number-id');
+    if (numIdEl && data.whatsapp_number_id) numIdEl.value = data.whatsapp_number_id;
+    const tokenEl = document.getElementById('setting-whatsapp-token');
+    if (tokenEl && data.whatsapp_token) tokenEl.value = data.whatsapp_token;
+
     // Alert toggles
     const unknownEl = document.getElementById('setting-unknown-person-alert');
     if (unknownEl) unknownEl.checked = !!data.unknown_person_alert;
@@ -2082,6 +2092,8 @@ async function saveFullConfig() {
     await window._supabase.from('home_config').update({
         notifications_enabled: document.getElementById('setting-notifications-enabled')?.checked || false,
         alert_phones: phones,
+        whatsapp_number_id: document.getElementById('setting-whatsapp-number-id')?.value || null,
+        whatsapp_token: document.getElementById('setting-whatsapp-token')?.value || null,
         unknown_person_alert: document.getElementById('setting-unknown-person-alert')?.checked || false,
         phone_usage_alert: document.getElementById('setting-phone-usage-alert')?.checked || false,
         phone_limit_minutes: parseInt(document.getElementById('setting-phone-limit')?.value) || 60,
@@ -2091,6 +2103,63 @@ async function saveFullConfig() {
 
     if (btn) { btn.textContent = '✅ Guardado'; btn.disabled = false; }
     setTimeout(() => { if (btn) btn.textContent = '💾 Guardar Configuración'; }, 2000);
+}
+
+// ─── RPi Heartbeat Polling ───────────────────────────────
+
+async function pollRpiHeartbeat() {
+    if (!window._supabase) return;
+    try {
+        const { data } = await window._supabase
+            .from('home_heartbeats')
+            .select('*')
+            .eq('device_id', 'rpi5')
+            .order('last_seen', { ascending: false })
+            .limit(1)
+            .single();
+
+        const widget = document.getElementById('rpi-status-widget');
+        if (!widget || !data) return;
+
+        const lastSeen = new Date(data.last_seen);
+        const ago = (Date.now() - lastSeen.getTime()) / 1000;
+        const isOnline = ago < 120; // 2 min threshold
+
+        const dot = document.getElementById('rpi-dot');
+        const icon = document.getElementById('rpi-icon');
+        const text = document.getElementById('rpi-status-text');
+        const detail = document.getElementById('rpi-status-detail');
+        const container = widget.querySelector('div');
+
+        if (isOnline) {
+            container.style.background = 'var(--accent-green-dim)';
+            dot.style.background = 'var(--accent-green)';
+            icon.setAttribute('stroke', 'var(--accent-green)');
+            text.style.color = 'var(--accent-green)';
+            text.textContent = `RPi5 — Online`;
+
+            const parts = [];
+            if (data.cpu_temp) parts.push(`🌡️ ${data.cpu_temp.toFixed(1)}°C`);
+            if (data.cameras_processing != null) parts.push(`📹 ${data.cameras_processing} cámaras`);
+            if (data.ip_address) parts.push(`📡 ${data.ip_address}`);
+            if (data.uptime_seconds) {
+                const h = Math.floor(data.uptime_seconds / 3600);
+                const m = Math.floor((data.uptime_seconds % 3600) / 60);
+                parts.push(`⏱️ ${h}h ${m}m`);
+            }
+            detail.textContent = parts.join(' • ') || 'Conectado';
+        } else {
+            container.style.background = 'var(--accent-red-dim)';
+            dot.style.background = 'var(--accent-red)';
+            icon.setAttribute('stroke', 'var(--accent-red)');
+            text.style.color = 'var(--accent-red)';
+            text.textContent = 'RPi5 — Offline';
+            const minAgo = Math.floor(ago / 60);
+            detail.textContent = minAgo > 0 ? `Último contacto hace ${minAgo}min` : 'Sin conexión';
+        }
+    } catch (e) {
+        // Silently fail
+    }
 }
 
 // Start when DOM is ready
