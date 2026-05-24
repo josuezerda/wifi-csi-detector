@@ -168,11 +168,20 @@ function handleCSIFrame(data) {
     state.frameCount++;
     state.fpsCounter++;
 
+    // Always update presence indicator (lightweight)
     updatePresenceUI(data);
     updateStatsUI(data);
-    updateAmplitudeChart(data);
-    updateVarianceChart(data);
-    updateHeatmap(data);
+
+    // Throttle heavy chart updates (every 3rd frame)
+    if (state.frameCount % 3 === 0) {
+        updateAmplitudeChart(data);
+        updateVarianceChart(data);
+    }
+    // Throttle heatmap (every 5th frame)
+    if (state.frameCount % 5 === 0) {
+        updateHeatmap(data);
+    }
+    // Events only on detection changes
     updateEventsFromFrame(data);
 }
 
@@ -1129,24 +1138,33 @@ function updateHeatmap(data) {
     if (!data.amplitudes) return;
 
     const canvas = document.getElementById('heatmap-canvas');
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // Agregar columna de datos
+    // Set internal canvas size to match data dimensions
+    const cols = CONFIG.heatmapHistory;
+    const rows = CONFIG.numSubcarriers;
+    if (canvas.width !== cols || canvas.height !== rows) {
+        canvas.width = cols;
+        canvas.height = rows;
+    }
+
+    // Add data column
     state.heatmapData.push(data.amplitudes);
-    if (state.heatmapData.length > CONFIG.heatmapHistory) {
+    if (state.heatmapData.length > cols) {
         state.heatmapData.shift();
     }
 
-    // Redibujar
-    const imgData = ctx.createImageData(canvas.width, canvas.height);
+    // Draw
+    const imgData = ctx.createImageData(cols, rows);
 
     for (let col = 0; col < state.heatmapData.length; col++) {
         const column = state.heatmapData[col];
-        for (let row = 0; row < CONFIG.numSubcarriers; row++) {
+        for (let row = 0; row < rows; row++) {
             const value = column[row] || 0;
-            const normalized = Math.min(1, value / 40); // Normalizar a 0-1
+            const normalized = Math.min(1, value / 40);
             const color = heatmapColor(normalized);
-            const pixelIndex = ((CONFIG.numSubcarriers - 1 - row) * canvas.width + col) * 4;
+            const pixelIndex = ((rows - 1 - row) * cols + col) * 4;
 
             imgData.data[pixelIndex] = color[0];
             imgData.data[pixelIndex + 1] = color[1];
@@ -1155,10 +1173,10 @@ function updateHeatmap(data) {
         }
     }
 
-    // Rellenar columnas vacías con fondo oscuro
-    for (let col = state.heatmapData.length; col < canvas.width; col++) {
-        for (let row = 0; row < canvas.height; row++) {
-            const pixelIndex = (row * canvas.width + col) * 4;
+    // Fill empty columns
+    for (let col = state.heatmapData.length; col < cols; col++) {
+        for (let row = 0; row < rows; row++) {
+            const pixelIndex = (row * cols + col) * 4;
             imgData.data[pixelIndex] = 13;
             imgData.data[pixelIndex + 1] = 27;
             imgData.data[pixelIndex + 2] = 42;
@@ -1626,7 +1644,7 @@ function startLocalSimulator() {
     localSimInterval = setInterval(() => {
         const frame = localSimulator.generateFrame();
         handleCSIFrame(frame);
-    }, 100); // 10 FPS
+    }, 250); // 4 FPS (optimized)
 }
 
 function stopLocalSimulator() {
