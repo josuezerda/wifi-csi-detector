@@ -18,10 +18,13 @@ import os
 import sys
 import threading
 import signal
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 import requests
 import numpy as np
+
+# ── Timezone Argentina (UTC-3) ────────────────────────────────
+TIMEZONE_AR = timezone(timedelta(hours=-3))
 
 # ── Configuración ─────────────────────────────────────────────
 API_URL = os.getenv("CONTROL_HOME_API_URL", "https://control-home.vercel.app")
@@ -200,7 +203,7 @@ def send_event(event_type, person_name, camera_name, confidence=None,
             "confidence": confidence,
             "person_id": person_id,
             "is_known": is_known,
-            "event_time": datetime.now().isoformat()
+            "event_time": datetime.now(TIMEZONE_AR).isoformat()
         }
         
         res = requests.post(
@@ -335,7 +338,7 @@ def heartbeat_loop(cameras_count_fn):
                 "uptime_seconds": get_uptime(),
                 "ip_address": get_local_ip(),
                 "version": "1.0.0",
-                "last_seen": datetime.utcnow().isoformat(),
+                "last_seen": datetime.now(TIMEZONE_AR).isoformat(),
             }
             
             headers = {
@@ -498,7 +501,7 @@ class CameraProcessor:
             print(f"  🚶 {self.name}: {count} persona(s) detectada(s) por YOLO")
             send_event("person_detected", f"{count} persona(s)", self.name, 
                        confidence=None, person_id=None, is_known=True)
-            msg = f"Persona detectada en {self.name} - Cantidad: {count} - Hora: {datetime.now().strftime(chr(37)+chr(72)+chr(58)+chr(37)+chr(77)+chr(58)+chr(37)+chr(83))}"
+            msg = f"Persona detectada en {self.name} - Cantidad: {count} - Hora: {datetime.now(TIMEZONE_AR).strftime(chr(37)+chr(72)+chr(58)+chr(37)+chr(77)+chr(58)+chr(37)+chr(83))}"
             send_whatsapp_alert(msg)
             self.last_detection[key] = now
     
@@ -560,7 +563,7 @@ class CameraProcessor:
                         f"📱 ALERTA: Límite de celular superado\n"
                         f"⏱️ Sesión: {mins}m {secs}s\n"
                         f"📹 Cámara: {self.name}\n"
-                        f"🕐 Hora: {datetime.now().strftime('%H:%M:%S')}"
+                        f"🕐 Hora: {datetime.now(TIMEZONE_AR).strftime('%H:%M:%S')}"
                     )
         except Exception as e:
             print(f"  ❌ Error guardando sesión de celular: {e}")
@@ -585,7 +588,7 @@ class CameraProcessor:
                     send_whatsapp_alert(
                         f"🔴 ALERTA: Persona desconocida detectada\n"
                         f"📹 Cámara: {self.name}\n"
-                        f"🕐 Hora: {datetime.now().strftime('%H:%M:%S')}"
+                        f"🕐 Hora: {datetime.now(TIMEZONE_AR).strftime('%H:%M:%S')}"
                     )
     
     def release(self):
@@ -607,7 +610,7 @@ def main():
     print("=" * 60)
     print("🏠 CONTROL HOME — Raspberry Pi 5 Service")
     print("=" * 60)
-    print(f"⏰ Iniciado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"⏰ Iniciado: {datetime.now(TIMEZONE_AR).strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"🔄 Intervalo de detección: {DETECTION_INTERVAL}s")
     print()
     
