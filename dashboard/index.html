@@ -16,7 +16,7 @@
     <nav class="navbar">
         <a href="#" class="nav-logo">Spectra</a>
         <ul class="nav-links">
-            <li><a href="#que-es">Tecnología</a></li>
+            <li><a href="#que-es">Plataforma</a></li>
             <li><a href="#aplicaciones">Aplicaciones</a></li>
             <li><a href="#como-funciona">Cómo funciona</a></li>
             <li><a href="#roadmap">Roadmap</a></li>
@@ -37,15 +37,14 @@
                 Detectamos presencia, movimiento y posición humana usando señales WiFi — sin cámaras, sin sensores, sin contacto.
             </p>
             <div class="hero-buttons">
-                <a href="login.html" class="btn-primary">Ver Demo en Vivo</a>
-                <a href="https://github.com/josuezerda/wifi-csi-detector" target="_blank" class="btn-secondary">GitHub →</a>
+                <a href="login.html" class="btn-primary">Acceder a la Plataforma</a>
+                <a href="#aplicaciones" class="btn-secondary">Explorar Aplicaciones →</a>
             </div>
             <div class="hero-pills">
-                <span class="pill">Open Source</span>
-                <span class="pill">ESP32 CSI</span>
-                <span class="pill">Raspberry Pi</span>
-                <span class="pill">Python</span>
-                <span class="pill">WebSocket</span>
+                <span class="pill">Detección en Tiempo Real</span>
+                <span class="pill">Sin Cámaras</span>
+                <span class="pill">Triangulación 2D</span>
+                <span class="pill">Tecnología Propietaria</span>
             </div>
         </div>
     </section>
@@ -60,18 +59,18 @@
         <div class="features-grid">
             <div class="feature-card">
                 <div class="feature-icon">📡</div>
-                <h3>Señales WiFi (CSI)</h3>
-                <p>Extraemos Channel State Information de 64 subportadoras OFDM entre transmisores ESP32. Cada frame contiene amplitud y fase de cada subportadora.</p>
+                <h3>Análisis de Señal</h3>
+                <p>Utilizamos las señales WiFi existentes en cualquier espacio para detectar alteraciones causadas por la presencia humana, en tiempo real.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">🧠</div>
-                <h3>Algoritmos en Tiempo Real</h3>
-                <p>Procesamiento por varianza, análisis de zonas de Fresnel y correlación de subportadoras. Detección en menos de 100ms con baja latencia.</p>
+                <h3>Inteligencia Integrada</h3>
+                <p>Algoritmos propietarios de análisis espacial procesan miles de datos por segundo para identificar presencia, movimiento y actividad.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">🎯</div>
-                <h3>Detección Precisa</h3>
-                <p>Presencia, movimiento, respiración, velocidad y posición 2D por triangulación con múltiples enlaces WiFi.</p>
+                <h3>Precisión Avanzada</h3>
+                <p>Detectamos presencia, movimiento, respiración y posición en 2D. Sin cámaras, sin sensores corporales, sin contacto físico.</p>
             </div>
         </div>
     </section>
@@ -152,121 +151,32 @@
     <!-- ─── Cómo funciona ─── -->
     <section id="como-funciona" class="fade-in">
         <span class="section-label">Cómo funciona</span>
-        <h2 class="section-title">De ondas WiFi a percepción espacial</h2>
+        <h2 class="section-title">Percepción espacial invisible</h2>
         <div class="steps-row">
             <div class="step-card">
                 <div class="step-num">1</div>
-                <h4>Transmisión</h4>
-                <p>Las señales WiFi de los ESP32 llenan el espacio con ondas electromagnéticas a 2.4GHz.</p>
+                <h4>Emisión</h4>
+                <p>Nuestros dispositivos emiten señales de radiofrecuencia que llenan el espacio de forma imperceptible.</p>
             </div>
             <div class="step-card">
                 <div class="step-num">2</div>
                 <h4>Perturbación</h4>
-                <p>El cuerpo humano absorbe y refleja las ondas, alterando la amplitud y fase de las subportadoras.</p>
+                <p>Cualquier presencia humana altera estas señales. Cada movimiento, respiración o postura deja una huella detectable.</p>
             </div>
             <div class="step-card">
                 <div class="step-num">3</div>
-                <h4>Análisis</h4>
-                <p>Procesamos en tiempo real la varianza, zonas de Fresnel y correlación entre subportadoras.</p>
+                <h4>Procesamiento</h4>
+                <p>Nuestros algoritmos propietarios procesan las alteraciones en tiempo real con latencia inferior a 100ms.</p>
             </div>
             <div class="step-card">
                 <div class="step-num">4</div>
-                <h4>Detección</h4>
-                <p>Determinamos presencia, posición, movimiento, velocidad y actividad con alta precisión.</p>
+                <h4>Visualización</h4>
+                <p>El dashboard muestra presencia, posición, movimiento y actividad en un panel de control en tiempo real.</p>
             </div>
         </div>
     </section>
 
-    <!-- ─── Tecnología ─── -->
-    <section id="tecnologia" class="fade-in">
-        <span class="section-label">Stack Técnico</span>
-        <h2 class="section-title">Arquitectura del sistema</h2>
-        <div class="tech-layout">
-            <div class="tech-diagram">
-                <div class="tech-flow">
-                    <div class="tech-node">
-                        <div class="tech-node-icon">📡</div>
-                        <div class="tech-node-text">
-                            <strong>ESP32 TX</strong>
-                            <span>Transmite paquetes WiFi CSI @ 10Hz</span>
-                        </div>
-                    </div>
-                    <div class="tech-arrow">↓ ondas 2.4GHz</div>
-                    <div class="tech-node">
-                        <div class="tech-node-icon">📶</div>
-                        <div class="tech-node-text">
-                            <strong>Espacio Monitoreado</strong>
-                            <span>Las personas perturban la señal</span>
-                        </div>
-                    </div>
-                    <div class="tech-arrow">↓ señal alterada</div>
-                    <div class="tech-node">
-                        <div class="tech-node-icon">📡</div>
-                        <div class="tech-node-text">
-                            <strong>ESP32 RX</strong>
-                            <span>Captura CSI: 64 subportadoras I/Q</span>
-                        </div>
-                    </div>
-                    <div class="tech-arrow">↓ USB serial 921600 baud</div>
-                    <div class="tech-node">
-                        <div class="tech-node-icon">🖥️</div>
-                        <div class="tech-node-text">
-                            <strong>Raspberry Pi 5</strong>
-                            <span>Python → procesamiento → WebSocket</span>
-                        </div>
-                    </div>
-                    <div class="tech-arrow">↓ ws://</div>
-                    <div class="tech-node">
-                        <div class="tech-node-icon">📊</div>
-                        <div class="tech-node-text">
-                            <strong>Dashboard Web</strong>
-                            <span>Visualización en tiempo real</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div>
-                <div class="tech-stack-cat">
-                    <h4>Hardware</h4>
-                    <div class="tech-tags">
-                        <span class="tech-tag">ESP32-WROOM-32</span>
-                        <span class="tech-tag">ESP32-WROOM-32U</span>
-                        <span class="tech-tag">Raspberry Pi 5</span>
-                        <span class="tech-tag">Antena 2.4GHz</span>
-                    </div>
-                </div>
-                <div class="tech-stack-cat">
-                    <h4>Software</h4>
-                    <div class="tech-tags">
-                        <span class="tech-tag">Python 3</span>
-                        <span class="tech-tag">WebSocket</span>
-                        <span class="tech-tag">Chart.js</span>
-                        <span class="tech-tag">Canvas 2D</span>
-                        <span class="tech-tag">HTML/CSS/JS</span>
-                    </div>
-                </div>
-                <div class="tech-stack-cat">
-                    <h4>Algoritmos</h4>
-                    <div class="tech-tags">
-                        <span class="tech-tag">CSI Extraction</span>
-                        <span class="tech-tag">Fresnel Zones</span>
-                        <span class="tech-tag">Triangulación</span>
-                        <span class="tech-tag">Varianza σ²</span>
-                        <span class="tech-tag">OFDM Analysis</span>
-                    </div>
-                </div>
-                <div class="tech-stack-cat">
-                    <h4>Futuro</h4>
-                    <div class="tech-tags">
-                        <span class="tech-tag">TensorFlow</span>
-                        <span class="tech-tag">PyTorch</span>
-                        <span class="tech-tag">RF Tomography</span>
-                        <span class="tech-tag">Pose Estimation</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+
 
     <!-- ─── Ética ─── -->
     <section class="fade-in">
@@ -279,7 +189,7 @@
             <div class="ethics-grid">
                 <div class="ethics-item">
                     <span class="ethics-check">✓</span>
-                    <p><strong>Procesamiento local</strong><br>Todo se procesa en tu Raspberry Pi. Ningún dato sale de tu red.</p>
+                    <p><strong>Procesamiento local</strong><br>Todo se procesa en el dispositivo. Ningún dato sale de tu red.</p>
                 </div>
                 <div class="ethics-item">
                     <span class="ethics-check">✓</span>
@@ -287,7 +197,7 @@
                 </div>
                 <div class="ethics-item">
                     <span class="ethics-check">✓</span>
-                    <p><strong>Open source</strong><br>Código 100% abierto y auditable. Transparencia total sobre qué hace y cómo.</p>
+                    <p><strong>Auditable</strong><br>Tecnología verificable y transparente. Cumplimiento normativo garantizado.</p>
                 </div>
                 <div class="ethics-item">
                     <span class="ethics-check">✓</span>
@@ -308,31 +218,31 @@
     <!-- ─── Roadmap ─── -->
     <section id="roadmap" class="fade-in">
         <span class="section-label">Roadmap</span>
-        <h2 class="section-title">Evolución del proyecto</h2>
+        <h2 class="section-title">Evolución de la plataforma</h2>
         <div class="roadmap">
             <div class="roadmap-item">
                 <div class="roadmap-dot done"></div>
                 <div class="roadmap-phase">Fase 1 — Completada</div>
                 <h4>Detección de Presencia</h4>
-                <p>Análisis de varianza de subportadoras para detectar presencia/ausencia con 95% de precisión.</p>
+                <p>Detección de presencia y ausencia con 95% de precisión mediante análisis de señal avanzado.</p>
             </div>
             <div class="roadmap-item">
                 <div class="roadmap-dot active"></div>
                 <div class="roadmap-phase">Fase 2 — En progreso</div>
                 <h4>Triangulación 2D</h4>
-                <p>4 nodos ESP32 en configuración cruzada para estimar posición X,Y en la habitación.</p>
+                <p>Red de sensores en configuración cruzada para estimar posición X,Y en tiempo real.</p>
             </div>
             <div class="roadmap-item">
                 <div class="roadmap-dot"></div>
                 <div class="roadmap-phase">Fase 3 — Planificada</div>
                 <h4>IA + Clasificación de Actividad</h4>
-                <p>Redes neuronales para clasificar actividades: caminar, sentarse, dormir, respirar.</p>
+                <p>Inteligencia artificial para clasificar actividades: caminar, sentarse, dormir, respirar.</p>
             </div>
             <div class="roadmap-item">
                 <div class="roadmap-dot"></div>
                 <div class="roadmap-phase">Fase 4 — Investigación</div>
                 <h4>Reconstrucción de Pose Humana</h4>
-                <p>Modelos transformer para reconstruir esqueleto humano a partir de señales RF, como WiFi-Kinect.</p>
+                <p>Reconstrucción del esqueleto humano a partir de señales de radiofrecuencia en tiempo real.</p>
             </div>
         </div>
     </section>
@@ -349,13 +259,13 @@
         <div class="footer-brand">
             <strong>Spectra</strong><br>
             Sistema de Percepción Espacial por Radiofrecuencia<br>
-            © 2026 — Open Source
+            © 2026 — Todos los derechos reservados
         </div>
         <div class="footer-links">
-            <a href="https://github.com/josuezerda/wifi-csi-detector" target="_blank">GitHub</a>
-            <a href="#que-es">Documentación</a>
-            <a href="#tecnologia">Stack Técnico</a>
-            <a href="login.html">Dashboard</a>
+            <a href="#que-es">Plataforma</a>
+            <a href="#aplicaciones">Aplicaciones</a>
+            <a href="#roadmap">Roadmap</a>
+            <a href="login.html">Acceder</a>
         </div>
     </footer>
 
