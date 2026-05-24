@@ -1681,7 +1681,202 @@ function init() {
     // Try WebSocket first, fallback to local simulator
     connectWithFallback();
 
+    // Initialize Supabase features (cameras, persons, config, activity)
+    initSupabaseFeatures();
+
     addEvent('info', 'Dashboard inicializado');
+}
+
+// ═══════════════════════════════════════════════════════════
+// Supabase CRUD — Cameras, Persons, Config, Activity
+// ═══════════════════════════════════════════════════════════
+
+function initSupabaseFeatures() {
+    if (!window._supabase) return;
+
+    // Cameras page
+    loadCameras();
+    const addCamBtn = document.getElementById('btn-add-camera');
+    if (addCamBtn) addCamBtn.addEventListener('click', () => {
+        document.getElementById('modal-add-camera').style.display = '';
+    });
+    const addCamForm = document.getElementById('form-add-camera');
+    if (addCamForm) addCamForm.addEventListener('submit', handleAddCamera);
+
+    // Smart Home — load config + activity + persons
+    loadSmartHomeConfig();
+    loadActivityEvents();
+    loadPersonsList();
+
+    // Toggle listeners for smart home
+    const toggleMap = {
+        'toggle-alarm-perimeter': 'alarm_perimeter',
+        'toggle-night-mode': 'night_mode',
+        'toggle-email-alerts': 'email_alerts',
+        'toggle-rf-detection': 'rf_detection_enabled',
+        'toggle-camera-recording': 'camera_recording',
+        'toggle-siren': 'siren_enabled',
+    };
+    Object.entries(toggleMap).forEach(([elId, field]) => {
+        const el = document.getElementById(elId);
+        if (el) el.addEventListener('change', () => saveToggle(field, el.checked));
+    });
+}
+
+// ─── Cameras CRUD ────────────────────────────────────────
+
+async function loadCameras() {
+    const sb = window._supabase;
+    const { data, error } = await sb.from('home_cameras').select('*').order('created_at');
+    const grid = document.getElementById('cameras-grid');
+    if (!grid) return;
+
+    const cameras = data || [];
+    if (cameras.length === 0) {
+        grid.innerHTML = `
+            <div class="card camera-card" style="display:flex;align-items:center;justify-content:center;min-height:200px;grid-column:1/-1">
+                <div style="text-align:center;color:var(--text-muted)">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3" style="margin:0 auto 12px;display:block"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <p style="font-size:0.9rem;margin-bottom:4px">Sin cámaras configuradas</p>
+                    <p style="font-size:0.75rem">Hacé clic en "Agregar Cámara" para empezar</p>
+                </div>
+            </div>`;
+        return;
+    }
+
+    grid.innerHTML = cameras.map(cam => `
+        <div class="card camera-card">
+            <div class="card-header">
+                <h3>📷 ${cam.name}</h3>
+                <span class="badge ${cam.is_active ? 'badge-live' : ''}">${cam.is_active ? '● ONLINE' : 'OFFLINE'}</span>
+            </div>
+            <div class="camera-feed">
+                <div class="camera-placeholder">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <p>${cam.location || 'Sin ubicación'}</p>
+                    <span class="camera-url">${cam.rtsp_url || 'Sin RTSP'}</span>
+                </div>
+            </div>
+            <div class="camera-info" style="display:flex;justify-content:space-between;align-items:center">
+                <span>IP: <strong>${cam.rtsp_url ? cam.rtsp_url.match(/@([\d.]+)/)?.[1] || '—' : '—'}</strong></span>
+                <button onclick="deleteCamera('${cam.id}')" style="background:var(--accent-red-dim);color:var(--accent-red);border:none;padding:4px 10px;border-radius:6px;font-size:0.7rem;cursor:pointer;font-weight:600">Eliminar</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function handleAddCamera(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const ip = fd.get('ip');
+    const user = fd.get('username') || 'admin';
+    const pass = fd.get('password') || '';
+    const channel = fd.get('channel') || '1';
+    const rtsp_url = `rtsp://${user}:${pass}@${ip}:554/cam/realmonitor?channel=${channel}&subtype=0`;
+    const snapshot_url = `http://${ip}/cgi-bin/snapshot.cgi?channel=${channel}`;
+
+    await window._supabase.from('home_cameras').insert({
+        name: fd.get('name'),
+        location: fd.get('location'),
+        rtsp_url, snapshot_url,
+        username: user,
+        password: pass,
+    });
+
+    document.getElementById('modal-add-camera').style.display = 'none';
+    e.target.reset();
+    loadCameras();
+}
+
+async function deleteCamera(id) {
+    if (!confirm('¿Eliminar esta cámara?')) return;
+    await window._supabase.from('home_cameras').delete().eq('id', id);
+    loadCameras();
+}
+
+// ─── Smart Home Config ───────────────────────────────────
+
+async function loadSmartHomeConfig() {
+    const { data } = await window._supabase.from('home_config').select('*').eq('id', 'main').single();
+    if (!data) return;
+
+    const map = {
+        'toggle-alarm-perimeter': data.alarm_perimeter,
+        'toggle-night-mode': data.night_mode,
+        'toggle-email-alerts': data.email_alerts,
+        'toggle-rf-detection': data.rf_detection_enabled,
+        'toggle-camera-recording': data.camera_recording,
+        'toggle-siren': data.siren_enabled,
+    };
+    Object.entries(map).forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = !!val;
+    });
+}
+
+async function saveToggle(field, value) {
+    await window._supabase.from('home_config').update({
+        [field]: value,
+        updated_at: new Date().toISOString(),
+    }).eq('id', 'main');
+}
+
+// ─── Activity Events ─────────────────────────────────────
+
+async function loadActivityEvents() {
+    const { data } = await window._supabase
+        .from('home_presence_events')
+        .select('*')
+        .order('event_time', { ascending: false })
+        .limit(15);
+
+    const container = document.getElementById('sh-activity');
+    if (!container) return;
+
+    const events = data || [];
+    if (events.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem">Sin eventos registrados aún</div>';
+        return;
+    }
+
+    container.innerHTML = events.map(evt => {
+        const time = new Date(evt.event_time).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        const icon = evt.is_known ? '🟢' : '🔴';
+        return `<div class="sh-event"><span class="sh-event-time">${time}</span><span class="sh-event-text">${icon} <strong>${evt.person_name}</strong> — ${evt.event_type} ${evt.camera_name ? '(' + evt.camera_name + ')' : ''}</span></div>`;
+    }).join('');
+}
+
+// ─── Persons List ────────────────────────────────────────
+
+async function loadPersonsList() {
+    const { data } = await window._supabase
+        .from('home_persons')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+    const container = document.getElementById('persons-list');
+    const countBadge = document.getElementById('persons-count');
+    if (!container) return;
+
+    const persons = data || [];
+    if (countBadge) countBadge.textContent = persons.length;
+
+    if (persons.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;text-align:center">Sin personas registradas</p>';
+        return;
+    }
+
+    const emojiMap = { familia: '👨‍👩‍👧‍👦', empleada: '🏠', niñera: '👶', visita: '👋' };
+    container.innerHTML = persons.map(p => `
+        <div class="person-item">
+            <div class="person-avatar">${emojiMap[p.relationship] || '👤'}</div>
+            <div class="person-info">
+                <strong>${p.name}</strong>
+                <span>${p.relationship || 'Sin categoría'}${p.phone ? ' • 📱 ' + p.phone : ''}</span>
+            </div>
+        </div>
+    `).join('');
 }
 
 // Start when DOM is ready

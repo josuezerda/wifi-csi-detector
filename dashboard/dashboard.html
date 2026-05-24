@@ -55,7 +55,7 @@
                     <span class="user-role">Administrador</span>
                 </div>
             </div>
-            <button class="nav-item logout-btn" onclick="sessionStorage.removeItem('spectra_auth');window.location.href='index.html'">
+            <button class="nav-item logout-btn" onclick="if(window._supabase)window._supabase.auth.signOut();sessionStorage.removeItem('spectra_auth');window.location.href='login.html'">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 <span>Cerrar Sesión</span>
             </button>
@@ -272,66 +272,64 @@
     <!-- ─── PAGE: Cameras ─── -->
     <div class="page" id="page-cameras">
         <section class="cameras-section">
-            <div class="cameras-grid">
-                <div class="card camera-card">
-                    <div class="card-header">
-                        <h3>📷 Cámara 1 — Entrada Principal</h3>
-                        <span class="badge badge-live">● EN VIVO</span>
-                    </div>
-                    <div class="camera-feed">
-                        <div class="camera-placeholder">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                            <p>Conectar cámara RTSP / USB</p>
-                            <span class="camera-url">rtsp://192.168.1.100:554/stream1</span>
-                        </div>
-                    </div>
-                    <div class="camera-info">
-                        <span>Estado: <strong style="color:var(--accent-amber)">Esperando conexión</strong></span>
-                        <span>Detección: Movimiento + RF</span>
-                    </div>
-                </div>
-                <div class="card camera-card">
-                    <div class="card-header">
-                        <h3>📷 Cámara 2 — Patio Trasero</h3>
-                        <span class="badge">OFFLINE</span>
-                    </div>
-                    <div class="camera-feed">
-                        <div class="camera-placeholder">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                            <p>Conectar cámara RTSP / USB</p>
-                            <span class="camera-url">rtsp://192.168.1.101:554/stream1</span>
-                        </div>
-                    </div>
-                    <div class="camera-info">
-                        <span>Estado: <strong style="color:var(--text-muted)">Sin configurar</strong></span>
-                        <span>Detección: Movimiento</span>
-                    </div>
-                </div>
-                <div class="card camera-card">
-                    <div class="card-header">
-                        <h3>📷 Cámara 3 — Interior</h3>
-                        <span class="badge">OFFLINE</span>
-                    </div>
-                    <div class="camera-feed">
-                        <div class="camera-placeholder">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                            <p>Conectar cámara RTSP / USB</p>
-                            <span class="camera-url">rtsp://192.168.1.102:554/stream1</span>
-                        </div>
-                    </div>
-                    <div class="camera-info">
-                        <span>Estado: <strong style="color:var(--text-muted)">Sin configurar</strong></span>
-                        <span>Detección: RF + Movimiento</span>
-                    </div>
-                </div>
-                <div class="card camera-card add-camera-card">
-                    <div class="add-camera">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                        <p>Agregar Cámara</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <p style="color:var(--text-muted);font-size:0.8rem">Configurá y monitoreá tus cámaras Dahua</p>
+                <button class="btn-primary" id="btn-add-camera" style="padding:8px 16px;border-radius:8px;border:none;background:var(--accent-green);color:#fff;font-weight:600;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:6px">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Agregar Cámara
+                </button>
+            </div>
+            <div class="cameras-grid" id="cameras-grid">
+                <!-- Populated by JS -->
+                <div class="card camera-card" style="display:flex;align-items:center;justify-content:center;min-height:200px">
+                    <div style="text-align:center;color:var(--text-muted)">
+                        <div class="spinner" style="width:24px;height:24px;border:2px solid var(--accent-cyan);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 8px"></div>
+                        <p style="font-size:0.8rem">Cargando cámaras...</p>
                     </div>
                 </div>
             </div>
         </section>
+
+        <!-- Add Camera Modal -->
+        <div class="modal-overlay" id="modal-add-camera" style="display:none">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>📷 Nueva Cámara Dahua</h3>
+                    <button class="modal-close" onclick="document.getElementById('modal-add-camera').style.display='none'">&times;</button>
+                </div>
+                <form id="form-add-camera" class="modal-body">
+                    <div class="form-group">
+                        <label>Nombre</label>
+                        <input type="text" name="name" required placeholder="Cámara Entrada" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Ubicación</label>
+                        <input type="text" name="location" placeholder="Entrada principal" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>IP de la cámara</label>
+                        <input type="text" name="ip" required placeholder="192.168.1.100" class="form-input">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Usuario</label>
+                            <input type="text" name="username" value="admin" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Contraseña</label>
+                            <input type="password" name="password" class="form-input">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Canal</label>
+                        <input type="text" name="channel" value="1" class="form-input">
+                    </div>
+                    <button type="submit" class="btn-primary" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent-green);color:#fff;font-weight:600;cursor:pointer;margin-top:8px">
+                        Agregar Cámara
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
     <!-- END PAGE: Cameras -->
 
@@ -345,34 +343,22 @@
                     <div class="sh-zones">
                         <div class="sh-zone">
                             <div class="sh-zone-icon" style="background:var(--accent-green-dim);color:var(--accent-green)">LV</div>
-                            <div class="sh-zone-info">
-                                <strong>Living</strong>
-                                <span>2 sensores RF • 1 cámara</span>
-                            </div>
+                            <div class="sh-zone-info"><strong>Living</strong><span>2 sensores RF • 1 cámara</span></div>
                             <span class="sh-zone-status" style="color:var(--accent-green)">● Activo</span>
                         </div>
                         <div class="sh-zone">
                             <div class="sh-zone-icon" style="background:var(--accent-cyan-dim);color:var(--accent-cyan)">DR</div>
-                            <div class="sh-zone-info">
-                                <strong>Dormitorio</strong>
-                                <span>2 sensores RF • 0 cámaras</span>
-                            </div>
+                            <div class="sh-zone-info"><strong>Dormitorio</strong><span>2 sensores RF • 0 cámaras</span></div>
                             <span class="sh-zone-status" style="color:var(--accent-cyan)">● Activo</span>
                         </div>
                         <div class="sh-zone">
                             <div class="sh-zone-icon" style="background:var(--accent-amber-dim);color:var(--accent-amber)">CO</div>
-                            <div class="sh-zone-info">
-                                <strong>Cocina</strong>
-                                <span>0 sensores RF • 1 cámara</span>
-                            </div>
+                            <div class="sh-zone-info"><strong>Cocina</strong><span>0 sensores RF • 1 cámara</span></div>
                             <span class="sh-zone-status" style="color:var(--accent-amber)">● Parcial</span>
                         </div>
                         <div class="sh-zone">
                             <div class="sh-zone-icon" style="background:rgba(255,255,255,0.05);color:var(--text-muted)">PT</div>
-                            <div class="sh-zone-info">
-                                <strong>Patio</strong>
-                                <span>Sin configurar</span>
-                            </div>
+                            <div class="sh-zone-info"><strong>Patio</strong><span>Sin configurar</span></div>
                             <span class="sh-zone-status" style="color:var(--text-muted)">○ Inactivo</span>
                         </div>
                     </div>
@@ -381,41 +367,29 @@
                 <div class="card sh-controls-card">
                     <div class="card-header"><h3>⚡ Controles Rápidos</h3></div>
                     <div class="sh-controls">
-                        <div class="sh-control">
-                            <span>Alarma Perimetral</span>
-                            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
-                        </div>
-                        <div class="sh-control">
-                            <span>Modo Nocturno</span>
-                            <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
-                        </div>
-                        <div class="sh-control">
-                            <span>Alertas por Email</span>
-                            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
-                        </div>
-                        <div class="sh-control">
-                            <span>Detección RF</span>
-                            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
-                        </div>
-                        <div class="sh-control">
-                            <span>Grabación Cámaras</span>
-                            <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
-                        </div>
-                        <div class="sh-control">
-                            <span>Sirena</span>
-                            <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
-                        </div>
+                        <div class="sh-control"><span>Alarma Perimetral</span><label class="toggle"><input type="checkbox" id="toggle-alarm-perimeter"><span class="toggle-slider"></span></label></div>
+                        <div class="sh-control"><span>Modo Nocturno</span><label class="toggle"><input type="checkbox" id="toggle-night-mode"><span class="toggle-slider"></span></label></div>
+                        <div class="sh-control"><span>Alertas por Email</span><label class="toggle"><input type="checkbox" id="toggle-email-alerts"><span class="toggle-slider"></span></label></div>
+                        <div class="sh-control"><span>Detección RF</span><label class="toggle"><input type="checkbox" id="toggle-rf-detection" checked><span class="toggle-slider"></span></label></div>
+                        <div class="sh-control"><span>Grabación Cámaras</span><label class="toggle"><input type="checkbox" id="toggle-camera-recording"><span class="toggle-slider"></span></label></div>
+                        <div class="sh-control"><span>Sirena</span><label class="toggle"><input type="checkbox" id="toggle-siren"><span class="toggle-slider"></span></label></div>
+                    </div>
+                </div>
+                <!-- Persons summary -->
+                <div class="card sh-persons-card">
+                    <div class="card-header">
+                        <h3>👥 Personas Autorizadas</h3>
+                        <span class="badge" id="persons-count">0</span>
+                    </div>
+                    <div id="persons-list" style="padding:12px">
+                        <p style="color:var(--text-muted);font-size:0.8rem;text-align:center">Cargando...</p>
                     </div>
                 </div>
                 <!-- Activity log -->
                 <div class="card sh-activity-card">
                     <div class="card-header"><h3>📝 Actividad Reciente</h3></div>
                     <div class="sh-activity" id="sh-activity">
-                        <div class="sh-event"><span class="sh-event-time">10:42</span><span class="sh-event-text">Presencia detectada en <strong>Living</strong></span></div>
-                        <div class="sh-event"><span class="sh-event-time">10:38</span><span class="sh-event-text">Movimiento en <strong>Dormitorio</strong></span></div>
-                        <div class="sh-event"><span class="sh-event-time">10:30</span><span class="sh-event-text">Alarma perimetral activada</span></div>
-                        <div class="sh-event"><span class="sh-event-time">10:15</span><span class="sh-event-text">Sistema iniciado correctamente</span></div>
-                        <div class="sh-event"><span class="sh-event-time">09:45</span><span class="sh-event-text">Área <strong>Living</strong> sin presencia</span></div>
+                        <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem">Cargando eventos...</div>
                     </div>
                 </div>
             </div>
@@ -546,11 +520,24 @@
         <div class="fullscreen-body" id="fullscreen-body"></div>
     </div>
 
-    <!-- ─── Auth Check ─── -->
+    <!-- ─── Supabase SDK ─── -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- ─── Auth Check + Init ─── -->
     <script>
-        if (sessionStorage.getItem('spectra_auth') !== 'true') {
-            window.location.href = 'login.html';
-        }
+        const SUPABASE_URL = 'https://yqzbdovolgrmjiklrevc.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_pbpoD_mT-6sZV3B3hAYE8g_Ljhw-7KZ';
+        window._supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Check auth — redirect if no session
+        (async () => {
+            const { data: { session } } = await window._supabase.auth.getSession();
+            if (!session) {
+                // Fallback to legacy check
+                if (sessionStorage.getItem('spectra_auth') !== 'true') {
+                    window.location.href = 'login.html';
+                }
+            }
+        })();
     </script>
     <!-- ─── Scripts ────────────────────────────────────── -->
     <script src="app.js"></script>

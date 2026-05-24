@@ -30,3 +30,5 @@ Thumbs.db
 build/
 sdkconfig
 sdkconfig.old
+node_modules/
+proyectocamara/

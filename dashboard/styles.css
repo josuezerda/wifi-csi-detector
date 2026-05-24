@@ -1345,3 +1345,70 @@ body::before {
 .bottom-row .card:nth-child(1) { animation-delay: 0.25s; }
 .bottom-row .card:nth-child(2) { animation-delay: 0.3s; }
 
+/* ─── Modal ─────────────────────────────────────────────── */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+}
+.modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 90%; max-width: 440px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.2s ease-out;
+}
+.modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+.modal-header h3 { font-size: 0.95rem; color: var(--text-primary); }
+.modal-close {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 1.4rem; cursor: pointer; padding: 4px 8px;
+    border-radius: 6px; transition: background 0.2s;
+}
+.modal-close:hover { background: rgba(255,255,255,0.08); }
+.modal-body { padding: 20px; }
+
+/* ─── Form ──────────────────────────────────────────────── */
+.form-group { margin-bottom: 14px; }
+.form-group label {
+    display: block; font-size: 0.7rem; color: var(--text-muted);
+    font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.05em; margin-bottom: 6px;
+}
+.form-input {
+    width: 100%; padding: 10px 14px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text-primary);
+    font-size: 0.85rem; font-family: 'JetBrains Mono', monospace;
+    outline: none; transition: border-color 0.2s;
+}
+.form-input:focus { border-color: var(--accent-cyan); }
+.form-input::placeholder { color: var(--text-dimmed); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ─── Spinner ───────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Person Card ───────────────────────────────────────── */
+.person-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+.person-item:last-child { border-bottom: none; }
+.person-avatar {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent-cyan-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem;
+}
+.person-info { flex: 1; }
+.person-info strong { font-size: 0.8rem; color: var(--text-primary); }
+.person-info span { display: block; font-size: 0.65rem; color: var(--text-muted); }

@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -187,7 +188,7 @@
                         type="email"
                         id="email"
                         class="login-input"
-                        placeholder="email@spectra.com.ar"
+                        placeholder="superadmin@spectra.com"
                         autofocus
                         required
                     >
@@ -278,30 +279,47 @@
         requestAnimationFrame(draw);
     })();
 
-    // Auth credentials
-    const VALID_EMAIL = 'superadmin@spectra.com.ar';
-    const VALID_PASS = '0303456';
+    // Supabase SDK
+    const SUPABASE_URL = 'https://yqzbdovolgrmjiklrevc.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_pbpoD_mT-6sZV3B3hAYE8g_Ljhw-7KZ';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // Check if already logged in
-    if (sessionStorage.getItem('spectra_auth') === 'true') {
-        window.location.href = 'dashboard.html';
-    }
+    (async () => {
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (session) {
+            window.location.href = 'dashboard.html';
+        }
+    })();
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        const err = document.getElementById('login-error');
         const email = document.getElementById('email').value.trim().toLowerCase();
         const pass = document.getElementById('password').value;
 
-        if (email === VALID_EMAIL && pass === VALID_PASS) {
-            sessionStorage.setItem('spectra_auth', 'true');
-            sessionStorage.setItem('spectra_user', email);
-            window.location.href = 'dashboard.html';
-        } else {
-            const err = document.getElementById('login-error');
+        btn.textContent = 'Conectando...';
+        btn.disabled = true;
+        err.textContent = '';
+
+        const { data, error } = await _supabase.auth.signInWithPassword({
+            email: email,
+            password: pass,
+        });
+
+        if (error) {
             err.textContent = 'Credenciales incorrectas';
+            btn.textContent = 'Acceder al Sistema';
+            btn.disabled = false;
             document.getElementById('password').value = '';
             document.getElementById('password').focus();
             setTimeout(() => { err.textContent = ''; }, 3000);
+        } else {
+            // Also set legacy flag for backward compat
+            sessionStorage.setItem('spectra_auth', 'true');
+            sessionStorage.setItem('spectra_user', email);
+            window.location.href = 'dashboard.html';
         }
     });
     </script>
