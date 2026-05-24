@@ -54,7 +54,7 @@ const CONFIG = {
     maxDataPoints: 120,       // Puntos en gráfico de varianza
     heatmapHistory: 80,       // Columnas del heatmap
     numSubcarriers: 64,
-    chartUpdateRate: 100,     // ms entre actualizaciones de gráficos
+    chartUpdateRate: 500,     // ms entre actualizaciones de gráficos
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -352,7 +352,7 @@ function initAmplitudeChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: { duration: 80 },
+            animation: { duration: 0 },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -1065,11 +1065,17 @@ let visualAnimFrame = null;
 
 function startVisualLoop() {
     let lastTime = 0;
-    const targetInterval = 1000 / 30; // 30 FPS
+    const targetInterval = 1000 / 15; // 15 FPS (optimized)
 
     function loop(timestamp) {
         if (timestamp - lastTime >= targetInterval) {
             lastTime = timestamp;
+            // Only render if detection page is active
+            const detPage = document.getElementById('page-detection');
+            if (!detPage || !detPage.classList.contains('active')) {
+                visualAnimFrame = requestAnimationFrame(loop);
+                return;
+            }
             const data = state.lastFrame;
             drawRoomView(data);
             drawRadar(data);

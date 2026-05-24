@@ -75,31 +75,18 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Ambient background glow */
-body::before {
-    content: '';
-    position: fixed;
-    top: -200px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 800px;
-    height: 600px;
-    background: radial-gradient(ellipse, rgba(0, 229, 255, 0.04) 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-}
+/* Ambient background glow - disabled for performance */
 
 /* ─── Sidebar Navigation ─────────────────────────────────── */
 .sidebar {
     position: fixed;
     top: 0; left: 0; bottom: 0;
     width: 220px;
-    background: rgba(8, 12, 22, 0.95);
+    background: #080c16;
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     z-index: 50;
-    backdrop-filter: blur(12px);
 }
 .sidebar-brand {
     padding: 20px 20px 16px;
@@ -374,8 +361,8 @@ body::before {
     justify-content: space-between;
     height: var(--header-height);
     padding: 0 24px;
-    background: rgba(6, 10, 19, 0.85);
-    backdrop-filter: blur(20px) saturate(1.5);
+    background: rgba(6, 10, 19, 0.95);
+    backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
 }
 
@@ -1334,7 +1321,7 @@ body::before {
 }
 
 .card {
-    animation: fadeIn 0.5s ease-out;
+    animation: none;
 }
 
 .top-row .card:nth-child(1) { animation-delay: 0.05s; }
