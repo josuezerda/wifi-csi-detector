@@ -1929,15 +1929,15 @@ async function loadPersonsList() {
     `).join('');
 }
 
-// ─── Persons Page (full CRUD) ────────────────────────────
+// ─── Persons Page (full CRUD + Photos) ───────────────────
 
 async function loadPersonsPage() {
-    const { data } = await window._supabase.from('home_persons').select('*').order('name');
+    const { data: persons } = await window._supabase.from('home_persons').select('*').order('name');
     const grid = document.getElementById('persons-grid');
     if (!grid) return;
 
-    const persons = data || [];
-    if (persons.length === 0) {
+    const pList = persons || [];
+    if (pList.length === 0) {
         grid.innerHTML = `
             <div class="card" style="padding:40px;text-align:center;color:var(--text-muted);grid-column:1/-1">
                 <div style="font-size:2.5rem;margin-bottom:8px">👥</div>
@@ -1947,8 +1947,17 @@ async function loadPersonsPage() {
         return;
     }
 
+    // Load photo counts
+    const { data: photos } = await window._supabase.from('home_person_photos').select('person_id');
+    const photoCounts = {};
+    (photos || []).forEach(p => { photoCounts[p.person_id] = (photoCounts[p.person_id] || 0) + 1; });
+
     const emojiMap = { familia: '👨‍👩‍👧‍👦', empleada: '🏠', niñera: '👶', visita: '👋' };
-    grid.innerHTML = persons.map(p => `
+    grid.innerHTML = pList.map(p => {
+        const pc = photoCounts[p.id] || 0;
+        const photoColor = pc > 0 ? 'var(--accent-green)' : 'var(--text-dimmed)';
+        const photoBg = pc > 0 ? 'var(--accent-green-dim)' : 'var(--bg-input)';
+        return `
         <div class="card" style="padding:16px">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
                 <div style="width:48px;height:48px;border-radius:12px;background:${p.is_active ? 'var(--accent-green-dim)' : 'var(--bg-input)'};display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">
@@ -1961,12 +1970,22 @@ async function loadPersonsPage() {
                 </div>
                 <span style="padding:2px 8px;border-radius:10px;font-size:0.6rem;font-weight:600;${p.is_active ? 'background:var(--accent-green-dim);color:var(--accent-green)' : 'background:var(--bg-input);color:var(--text-muted)'}">${p.is_active ? 'Activa' : 'Inactiva'}</span>
             </div>
+            <!-- Photo status -->
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:${photoBg};border-radius:8px;margin-bottom:10px">
+                <span style="font-size:0.75rem">📷</span>
+                <span style="flex:1;font-size:0.7rem;color:${photoColor}">${pc} foto${pc !== 1 ? 's' : ''} facial${pc !== 1 ? 'es' : ''}</span>
+                ${pc > 0 ? '<span style="color:var(--accent-green)">✓</span>' : ''}
+                <label style="padding:3px 8px;border-radius:6px;background:var(--accent-cyan-dim);color:var(--accent-cyan);font-size:0.6rem;font-weight:600;cursor:pointer">
+                    📤 Subir foto
+                    <input type="file" accept="image/*" onchange="uploadPersonPhoto('${p.id}', this)" style="display:none">
+                </label>
+            </div>
             <div style="display:flex;gap:6px;padding-top:10px;border-top:1px solid var(--border)">
                 <button onclick="togglePersonActive('${p.id}', ${p.is_active})" style="flex:1;padding:6px;border:none;border-radius:6px;background:var(--bg-input);color:var(--text-muted);font-size:0.7rem;cursor:pointer;font-weight:500">${p.is_active ? '👤 Desactivar' : '✅ Activar'}</button>
                 <button onclick="deletePerson('${p.id}')" style="padding:6px 10px;border:none;border-radius:6px;background:var(--accent-red-dim);color:var(--accent-red);font-size:0.7rem;cursor:pointer;font-weight:600">✕</button>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 async function handleAddPerson(e) {
@@ -1980,7 +1999,35 @@ async function handleAddPerson(e) {
     document.getElementById('modal-add-person').style.display = 'none';
     e.target.reset();
     loadPersonsPage();
-    loadPersonsList(); // refresh summary
+    loadPersonsList();
+}
+
+async function uploadPersonPhoto(personId, input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const ext = file.name.split('.').pop();
+    const path = `${personId}/${Date.now()}.${ext}`;
+
+    // Upload to Supabase Storage
+    const { error: uploadErr } = await window._supabase.storage
+        .from('face-photos')
+        .upload(path, file, { contentType: file.type });
+
+    if (uploadErr) {
+        alert('Error subiendo foto: ' + uploadErr.message);
+        return;
+    }
+
+    // Record in home_person_photos
+    await window._supabase.from('home_person_photos').insert({
+        person_id: personId,
+        storage_path: path,
+        original_name: file.name,
+    });
+
+    input.value = '';
+    loadPersonsPage();
 }
 
 async function togglePersonActive(id, current) {
@@ -1990,7 +2037,13 @@ async function togglePersonActive(id, current) {
 }
 
 async function deletePerson(id) {
-    if (!confirm('¿Eliminar esta persona?')) return;
+    if (!confirm('¿Eliminar esta persona y todas sus fotos?')) return;
+    // Delete photos from storage
+    const { data: photos } = await window._supabase.from('home_person_photos').select('storage_path').eq('person_id', id);
+    if (photos && photos.length > 0) {
+        await window._supabase.storage.from('face-photos').remove(photos.map(p => p.storage_path));
+        await window._supabase.from('home_person_photos').delete().eq('person_id', id);
+    }
     await window._supabase.from('home_persons').delete().eq('id', id);
     loadPersonsPage();
     loadPersonsList();
