@@ -11,6 +11,8 @@ const PAGE_TITLES = {
     detection: 'Detección RF',
     cameras: 'Cámaras de Seguridad',
     smarthome: 'Control Home',
+    persons: 'Personas Autorizadas',
+    activity: 'Actividad',
     terminal: 'Terminal en Vivo',
     settings: 'Configuración',
 };
@@ -1703,10 +1705,47 @@ function initSupabaseFeatures() {
     const addCamForm = document.getElementById('form-add-camera');
     if (addCamForm) addCamForm.addEventListener('submit', handleAddCamera);
 
-    // Smart Home — load config + activity + persons
+    // Smart Home — load config + activity + persons summary
     loadSmartHomeConfig();
     loadActivityEvents();
     loadPersonsList();
+
+    // Persons page — full CRUD
+    loadPersonsPage();
+    const addPersonBtn = document.getElementById('btn-add-person');
+    if (addPersonBtn) addPersonBtn.addEventListener('click', () => {
+        document.getElementById('modal-add-person').style.display = '';
+    });
+    const addPersonForm = document.getElementById('form-add-person');
+    if (addPersonForm) addPersonForm.addEventListener('submit', handleAddPerson);
+
+    // Activity page — with filters
+    loadActivityPage();
+    const filterContainer = document.getElementById('activity-filters');
+    if (filterContainer) {
+        filterContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-filter]');
+            if (!btn) return;
+            filterContainer.querySelectorAll('.filter-btn').forEach(b => {
+                b.style.borderColor = 'var(--border)';
+                b.style.background = 'transparent';
+                b.style.color = 'var(--text-muted)';
+                b.classList.remove('active');
+            });
+            btn.style.borderColor = 'var(--accent-cyan)';
+            btn.style.background = 'var(--accent-cyan-dim)';
+            btn.style.color = 'var(--accent-cyan)';
+            btn.classList.add('active');
+            loadActivityPage(btn.dataset.filter);
+        });
+    }
+
+    // Settings — load full config
+    loadSettingsConfig();
+
+    // Settings — save button
+    const saveBtn = document.getElementById('btn-save-config');
+    if (saveBtn) saveBtn.addEventListener('click', saveFullConfig);
 
     // Toggle listeners for smart home
     const toggleMap = {
@@ -1721,13 +1760,20 @@ function initSupabaseFeatures() {
         const el = document.getElementById(elId);
         if (el) el.addEventListener('change', () => saveToggle(field, el.checked));
     });
+
+    // Notifications toggle text update
+    const notifToggle = document.getElementById('setting-notifications-enabled');
+    if (notifToggle) notifToggle.addEventListener('change', () => {
+        const txt = document.getElementById('notif-status-text');
+        if (txt) txt.textContent = notifToggle.checked ? 'Las alertas WhatsApp están activas' : 'Todas las alertas están desactivadas';
+    });
 }
 
 // ─── Cameras CRUD ────────────────────────────────────────
 
 async function loadCameras() {
     const sb = window._supabase;
-    const { data, error } = await sb.from('home_cameras').select('*').order('created_at');
+    const { data } = await sb.from('home_cameras').select('*').order('created_at');
     const grid = document.getElementById('cameras-grid');
     if (!grid) return;
 
@@ -1821,7 +1867,7 @@ async function saveToggle(field, value) {
     }).eq('id', 'main');
 }
 
-// ─── Activity Events ─────────────────────────────────────
+// ─── Activity Events (Smart Home sidebar) ────────────────
 
 async function loadActivityEvents() {
     const { data } = await window._supabase
@@ -1846,7 +1892,7 @@ async function loadActivityEvents() {
     }).join('');
 }
 
-// ─── Persons List ────────────────────────────────────────
+// ─── Persons List (Smart Home summary) ───────────────────
 
 async function loadPersonsList() {
     const { data } = await window._supabase
@@ -1877,6 +1923,174 @@ async function loadPersonsList() {
             </div>
         </div>
     `).join('');
+}
+
+// ─── Persons Page (full CRUD) ────────────────────────────
+
+async function loadPersonsPage() {
+    const { data } = await window._supabase.from('home_persons').select('*').order('name');
+    const grid = document.getElementById('persons-grid');
+    if (!grid) return;
+
+    const persons = data || [];
+    if (persons.length === 0) {
+        grid.innerHTML = `
+            <div class="card" style="padding:40px;text-align:center;color:var(--text-muted);grid-column:1/-1">
+                <div style="font-size:2.5rem;margin-bottom:8px">👥</div>
+                <p style="font-size:0.9rem;margin-bottom:4px">Sin personas registradas</p>
+                <p style="font-size:0.75rem">Agregá personas para que el sistema las reconozca</p>
+            </div>`;
+        return;
+    }
+
+    const emojiMap = { familia: '👨‍👩‍👧‍👦', empleada: '🏠', niñera: '👶', visita: '👋' };
+    grid.innerHTML = persons.map(p => `
+        <div class="card" style="padding:16px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+                <div style="width:48px;height:48px;border-radius:12px;background:${p.is_active ? 'var(--accent-green-dim)' : 'var(--bg-input)'};display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">
+                    ${emojiMap[p.relationship] || '👤'}
+                </div>
+                <div style="flex:1;min-width:0">
+                    <strong style="color:var(--text-primary);font-size:0.9rem">${p.name}</strong>
+                    <p style="font-size:0.7rem;color:var(--text-muted);text-transform:capitalize">${p.relationship || 'Sin categoría'}</p>
+                    ${p.phone ? `<p style="font-size:0.65rem;color:var(--text-dimmed)">📱 ${p.phone}</p>` : ''}
+                </div>
+                <span style="padding:2px 8px;border-radius:10px;font-size:0.6rem;font-weight:600;${p.is_active ? 'background:var(--accent-green-dim);color:var(--accent-green)' : 'background:var(--bg-input);color:var(--text-muted)'}">${p.is_active ? 'Activa' : 'Inactiva'}</span>
+            </div>
+            <div style="display:flex;gap:6px;padding-top:10px;border-top:1px solid var(--border)">
+                <button onclick="togglePersonActive('${p.id}', ${p.is_active})" style="flex:1;padding:6px;border:none;border-radius:6px;background:var(--bg-input);color:var(--text-muted);font-size:0.7rem;cursor:pointer;font-weight:500">${p.is_active ? '👤 Desactivar' : '✅ Activar'}</button>
+                <button onclick="deletePerson('${p.id}')" style="padding:6px 10px;border:none;border-radius:6px;background:var(--accent-red-dim);color:var(--accent-red);font-size:0.7rem;cursor:pointer;font-weight:600">✕</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function handleAddPerson(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    await window._supabase.from('home_persons').insert({
+        name: fd.get('name'),
+        relationship: fd.get('relationship') || null,
+        phone: fd.get('phone') || null,
+    });
+    document.getElementById('modal-add-person').style.display = 'none';
+    e.target.reset();
+    loadPersonsPage();
+    loadPersonsList(); // refresh summary
+}
+
+async function togglePersonActive(id, current) {
+    await window._supabase.from('home_persons').update({ is_active: !current }).eq('id', id);
+    loadPersonsPage();
+    loadPersonsList();
+}
+
+async function deletePerson(id) {
+    if (!confirm('¿Eliminar esta persona?')) return;
+    await window._supabase.from('home_persons').delete().eq('id', id);
+    loadPersonsPage();
+    loadPersonsList();
+}
+
+// ─── Activity Page (full with filters) ───────────────────
+
+async function loadActivityPage(filter = 'all') {
+    let query = window._supabase
+        .from('home_presence_events')
+        .select('*')
+        .order('event_time', { ascending: false })
+        .limit(100);
+
+    if (filter === 'known') query = query.eq('is_known', true);
+    if (filter === 'unknown') query = query.eq('is_known', false);
+
+    const { data } = await query;
+    const container = document.getElementById('activity-list');
+    if (!container) return;
+
+    const events = data || [];
+    if (events.length === 0) {
+        container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted)">
+            <div style="font-size:2rem;margin-bottom:8px">📋</div>
+            <p style="font-size:0.85rem">Sin eventos registrados</p>
+        </div>`;
+        return;
+    }
+
+    container.innerHTML = events.map(evt => {
+        const time = new Date(evt.event_time);
+        const timeStr = time.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = time.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+        const iconBg = evt.is_known ? 'var(--accent-green-dim)' : 'var(--accent-red-dim)';
+        const iconColor = evt.is_known ? 'var(--accent-green)' : 'var(--accent-red)';
+        const icon = evt.is_known ? '🛡️' : '⚠️';
+
+        return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);transition:background 0.15s" onmouseenter="this.style.background='rgba(255,255,255,0.02)'" onmouseleave="this.style.background='transparent'">
+            <div style="width:36px;height:36px;border-radius:10px;background:${iconBg};display:flex;align-items:center;justify-content:center;flex-shrink:0">${icon}</div>
+            <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <strong style="font-size:0.85rem;color:var(--text-primary)">${evt.person_name}</strong>
+                    <span style="font-size:0.65rem;color:${iconColor};font-weight:500">${evt.event_type}</span>
+                </div>
+                <p style="font-size:0.7rem;color:var(--text-dimmed)">${evt.camera_name || 'Cámara desconocida'}${evt.confidence ? ' • ' + (evt.confidence * 100).toFixed(0) + '% confianza' : ''}</p>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+                <p style="font-size:0.75rem;color:var(--text-secondary);font-weight:500">${timeStr}</p>
+                <p style="font-size:0.6rem;color:var(--text-dimmed)">${dateStr}</p>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ─── Settings Config (full load + save) ──────────────────
+
+async function loadSettingsConfig() {
+    const { data } = await window._supabase.from('home_config').select('*').eq('id', 'main').single();
+    if (!data) return;
+
+    // Notifications
+    const notifEl = document.getElementById('setting-notifications-enabled');
+    if (notifEl) {
+        notifEl.checked = !!data.notifications_enabled;
+        const txt = document.getElementById('notif-status-text');
+        if (txt) txt.textContent = data.notifications_enabled ? 'Las alertas WhatsApp están activas' : 'Todas las alertas están desactivadas';
+    }
+
+    // WhatsApp phones
+    const phonesEl = document.getElementById('setting-alert-phones');
+    if (phonesEl && data.alert_phones) phonesEl.value = data.alert_phones.join('\n');
+
+    // Alert toggles
+    const unknownEl = document.getElementById('setting-unknown-person-alert');
+    if (unknownEl) unknownEl.checked = !!data.unknown_person_alert;
+    const phoneAlertEl = document.getElementById('setting-phone-usage-alert');
+    if (phoneAlertEl) phoneAlertEl.checked = !!data.phone_usage_alert;
+
+    // Phone detection
+    const limitEl = document.getElementById('setting-phone-limit');
+    if (limitEl) limitEl.value = data.phone_limit_minutes || 60;
+    const intervalEl = document.getElementById('setting-detection-interval');
+    if (intervalEl) intervalEl.value = data.detection_interval_seconds || 2;
+}
+
+async function saveFullConfig() {
+    const btn = document.getElementById('btn-save-config');
+    if (btn) { btn.textContent = '⏳ Guardando...'; btn.disabled = true; }
+
+    const phones = (document.getElementById('setting-alert-phones')?.value || '').split('\n').filter(Boolean);
+
+    await window._supabase.from('home_config').update({
+        notifications_enabled: document.getElementById('setting-notifications-enabled')?.checked || false,
+        alert_phones: phones,
+        unknown_person_alert: document.getElementById('setting-unknown-person-alert')?.checked || false,
+        phone_usage_alert: document.getElementById('setting-phone-usage-alert')?.checked || false,
+        phone_limit_minutes: parseInt(document.getElementById('setting-phone-limit')?.value) || 60,
+        detection_interval_seconds: parseInt(document.getElementById('setting-detection-interval')?.value) || 2,
+        updated_at: new Date().toISOString(),
+    }).eq('id', 'main');
+
+    if (btn) { btn.textContent = '✅ Guardado'; btn.disabled = false; }
+    setTimeout(() => { if (btn) btn.textContent = '💾 Guardar Configuración'; }, 2000);
 }
 
 // Start when DOM is ready
