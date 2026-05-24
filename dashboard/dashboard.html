@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WiFi CSI Presence Detector — Detección de presencia humana mediante análisis de señal WiFi con ESP32">
+    <title>Spectra — Dashboard de Monitoreo</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- ─── Header ─────────────────────────────────────── -->
+    <header id="app-header">
+        <div class="header-left">
+            <div class="logo">
+                <div class="logo-icon" id="logo-pulse">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>Spectra</h1>
+                    <p class="subtitle">Sistema de Percepción Espacial</p>
+                </div>
+            </div>
+        </div>
+        <div class="header-center">
+            <div class="connection-status" id="connection-status">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-text">Conectando...</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="mode-toggle" id="mode-toggle">
+                <button class="mode-btn active" data-mode="demo" id="btn-demo">
+                    <span class="mode-icon">🎮</span> Demo
+                </button>
+                <button class="mode-btn" data-mode="live" id="btn-live">
+                    <span class="mode-icon">📡</span> Live
+                </button>
+            </div>
+            <a href="console.html" target="_blank" class="icon-btn console-link" title="Live Console">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+            </a>
+            <button class="icon-btn" id="btn-settings" title="Configuración">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+            </button>
+            <button class="icon-btn" id="btn-logout" title="Cerrar Sesión" onclick="sessionStorage.removeItem('spectra_auth');window.location.href='index.html'" style="color:#f85149">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- ─── Main Content ───────────────────────────────── -->
+    <main id="app-main">
+        <!-- ─── Top Row: Presence + Stats ──────────────── -->
+        <section class="top-row">
+            <!-- Indicador de Presencia Principal -->
+            <div class="card presence-card" id="presence-card">
+                <div class="presence-ring" id="presence-ring">
+                    <div class="presence-inner" id="presence-inner">
+                        <span class="presence-icon" id="presence-icon">👁️</span>
+                    </div>
+                </div>
+                <div class="presence-info">
+                    <h2 id="presence-label">Iniciando...</h2>
+                    <p class="presence-sublabel" id="presence-sublabel">Calibrando sensor</p>
+                </div>
+                <div class="presence-variance" id="presence-variance-display">
+                    <span class="variance-label">Varianza</span>
+                    <span class="variance-value" id="variance-value">0.0</span>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="card stat-card" id="stat-rssi">
+                    <div class="stat-icon rssi-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="stat-rssi-value">--</span>
+                        <span class="stat-unit">dBm</span>
+                    </div>
+                    <span class="stat-label">Señal WiFi</span>
+                </div>
+
+                <div class="card stat-card" id="stat-detections">
+                    <div class="stat-icon detections-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="stat-detections-value">0</span>
+                        <span class="stat-unit">det.</span>
+                    </div>
+                    <span class="stat-label">Detecciones</span>
+                </div>
+
+                <div class="card stat-card" id="stat-frames">
+                    <div class="stat-icon frames-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="stat-frames-value">0</span>
+                        <span class="stat-unit">fps</span>
+                    </div>
+                    <span class="stat-label">Frames</span>
+                </div>
+
+                <div class="card stat-card" id="stat-uptime">
+                    <div class="stat-icon uptime-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="stat-uptime-value">0:00</span>
+                        <span class="stat-unit"></span>
+                    </div>
+                    <span class="stat-label">Tiempo</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── Visual Row: Room + Radar ───────────────── -->
+        <section class="visual-row">
+            <!-- Vista de Habitación -->
+            <div class="card room-card">
+                <div class="card-header">
+                    <h3>🏠 Vista de Habitación</h3>
+                    <div class="card-actions">
+                        <span class="badge" id="room-activity-badge">Monitoreando</span>
+                        <button class="icon-btn small expand-btn" data-target="room-canvas" title="Expandir">⛶</button>
+                    </div>
+                </div>
+                <div class="room-container" id="room-container">
+                    <canvas id="room-canvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Radar Sonar -->
+            <div class="card radar-card">
+                <div class="card-header">
+                    <h3>📡 Radar de Detección</h3>
+                    <div class="card-actions">
+                        <span class="badge" id="radar-range-badge">Rango: 5m</span>
+                        <button class="icon-btn small expand-btn" data-target="radar-canvas" title="Expandir">⛶</button>
+                    </div>
+                </div>
+                <div class="radar-container">
+                    <canvas id="radar-canvas"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── Charts Row ─────────────────────────────── -->
+        <section class="charts-row">
+            <!-- Gráfico de Amplitud (principal) -->
+            <div class="card chart-card amplitude-chart-card">
+                <div class="card-header">
+                    <h3>📊 Amplitud de Subportadoras</h3>
+                    <div class="card-actions">
+                        <span class="badge" id="subcarrier-count">64 subportadoras</span>
+                        <button class="icon-btn small expand-btn" data-target="amplitude-chart" title="Expandir">⛶</button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="amplitude-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Gráfico de Varianza -->
+            <div class="card chart-card variance-chart-card">
+                <div class="card-header">
+                    <h3>📈 Varianza (Detección)</h3>
+                    <div class="card-actions">
+                        <span class="badge presence-badge" id="detection-badge">Monitoreando</span>
+                        <button class="icon-btn small expand-btn" data-target="variance-chart" title="Expandir">⛶</button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="variance-chart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── Bottom Row: Heatmap + Events ───────────── -->
+        <section class="bottom-row">
+            <!-- Heatmap de Subportadoras -->
+            <div class="card heatmap-card">
+                <div class="card-header">
+                    <h3>🌡️ Mapa de Calor — Subportadoras</h3>
+                    <div class="card-actions">
+                        <span class="badge" id="heatmap-info">Tiempo ➡️</span>
+                        <button class="icon-btn small expand-btn" data-target="heatmap-canvas" title="Expandir">⛶</button>
+                    </div>
+                </div>
+                <div class="heatmap-container">
+                    <canvas id="heatmap-canvas"></canvas>
+                    <div class="heatmap-legend">
+                        <span>Bajo</span>
+                        <div class="heatmap-gradient"></div>
+                        <span>Alto</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log de Eventos -->
+            <div class="card events-card">
+                <div class="card-header">
+                    <h3>📋 Eventos</h3>
+                    <button class="icon-btn small" id="btn-clear-events" title="Limpiar">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="events-list" id="events-list">
+                    <div class="event-item event-info">
+                        <span class="event-time">--:--:--</span>
+                        <span class="event-text">Esperando conexión al servidor...</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ─── Settings Panel (Sidebar) ───────────────────── -->
+    <aside class="settings-panel" id="settings-panel">
+        <div class="settings-header">
+            <h3>⚙️ Configuración</h3>
+            <button class="icon-btn" id="btn-close-settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="settings-content">
+            <!-- Detección -->
+            <div class="settings-section">
+                <h4>Detección</h4>
+
+                <div class="setting-item">
+                    <label for="setting-threshold">Umbral de presencia</label>
+                    <div class="setting-control">
+                        <input type="range" id="setting-threshold" min="3" max="40" step="0.5" value="12">
+                        <span class="setting-value" id="threshold-display">12.0</span>
+                    </div>
+                    <p class="setting-help">Varianza mínima para detectar presencia</p>
+                </div>
+
+                <div class="setting-item">
+                    <label for="setting-movement">Umbral de movimiento</label>
+                    <div class="setting-control">
+                        <input type="range" id="setting-movement" min="10" max="60" step="1" value="25">
+                        <span class="setting-value" id="movement-display">25</span>
+                    </div>
+                    <p class="setting-help">Varianza mínima para detectar movimiento activo</p>
+                </div>
+
+                <div class="setting-item">
+                    <label for="setting-sensitivity">Sensibilidad</label>
+                    <div class="setting-control">
+                        <input type="range" id="setting-sensitivity" min="0.1" max="1.0" step="0.05" value="0.7">
+                        <span class="setting-value" id="sensitivity-display">0.70</span>
+                    </div>
+                    <p class="setting-help">Mayor sensibilidad = detecta perturbaciones menores</p>
+                </div>
+
+                <div class="setting-item">
+                    <label for="setting-window">Ventana de análisis</label>
+                    <div class="setting-control">
+                        <input type="range" id="setting-window" min="10" max="100" step="5" value="50">
+                        <span class="setting-value" id="window-display">50</span>
+                    </div>
+                    <p class="setting-help">Frames para calcular varianza (mayor = más estable)</p>
+                </div>
+            </div>
+
+            <!-- Conexión Serial (modo live) -->
+            <div class="settings-section" id="serial-section">
+                <h4>Conexión Serial (ESP32)</h4>
+
+                <div class="setting-item">
+                    <label>Puerto Serial</label>
+                    <div class="serial-controls">
+                        <select id="serial-port-select">
+                            <option value="">Seleccionar puerto...</option>
+                        </select>
+                        <button class="btn btn-sm" id="btn-refresh-ports">🔄</button>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <label>Estado</label>
+                    <div class="serial-status" id="serial-status-display">
+                        <span class="status-dot disconnected"></span>
+                        <span>Desconectado</span>
+                    </div>
+                </div>
+
+                <div class="serial-buttons">
+                    <button class="btn btn-primary" id="btn-serial-connect">Conectar ESP32</button>
+                    <button class="btn btn-danger" id="btn-serial-disconnect" disabled>Desconectar</button>
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="settings-section">
+                <h4>Acciones</h4>
+                <button class="btn btn-full" id="btn-reset">🔄 Reiniciar Calibración</button>
+                <button class="btn btn-full btn-outline" id="btn-export">📥 Exportar Datos</button>
+            </div>
+
+            <!-- Info -->
+            <div class="settings-section settings-info">
+                <h4>Información</h4>
+                <div class="info-grid">
+                    <span>Modo:</span><span id="info-mode">Demo</span>
+                    <span>Frames:</span><span id="info-frames">0</span>
+                    <span>Presencia:</span><span id="info-presence">0%</span>
+                    <span>Servidor:</span><span id="info-server">--</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ─── Overlay for Settings ───────────────────────── -->
+    <div class="settings-overlay" id="settings-overlay"></div>
+
+    <!-- ─── Fullscreen Modal ───────────────────────────── -->
+    <div class="fullscreen-modal" id="fullscreen-modal">
+        <div class="fullscreen-header">
+            <h3 id="fullscreen-title">Visualización</h3>
+            <button class="icon-btn" id="btn-close-fullscreen" title="Cerrar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <div class="fullscreen-body" id="fullscreen-body"></div>
+    </div>
+
+    <!-- ─── Auth Check ─── -->
+    <script>
+        if (sessionStorage.getItem('spectra_auth') !== 'true') {
+            window.location.href = 'login.html';
+        }
+    </script>
+    <!-- ─── Scripts ────────────────────────────────────── -->
+    <script src="app.js"></script>
+</body>
+</html>
