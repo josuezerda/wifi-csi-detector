@@ -632,6 +632,16 @@ def main():
     print(f"  🧬 {len(known_encodings)} encoding(s) faciales")
     print()
     
+    # Iniciar thread de heartbeat ANTES de esperar cámaras
+    processors = []
+    hb_thread = threading.Thread(
+        target=heartbeat_loop,
+        args=(lambda: len(processors),),
+        daemon=True
+    )
+    hb_thread.start()
+    print("💓 Heartbeat activo (cada 30s)")
+    
     if not cameras:
         print("⚠️  No hay cámaras configuradas. Agregá cámaras desde el dashboard web.")
         print("   Esperando configuración...")
@@ -642,22 +652,12 @@ def main():
                 break
     
     # Crear procesadores
-    processors = []
     for cam in cameras:
         proc = CameraProcessor(cam, known_encodings, known_names, known_ids)
         processors.append(proc)
     
     print("🚀 Iniciando procesamiento de cámaras...")
     print("-" * 60)
-    
-    # Iniciar thread de heartbeat
-    hb_thread = threading.Thread(
-        target=heartbeat_loop,
-        args=(lambda: len(processors),),
-        daemon=True
-    )
-    hb_thread.start()
-    print("💓 Heartbeat activo (cada 30s)")
     
     # Recargar personas cada 5 minutos
     os.makedirs("/home/pi/control-home/snapshots", exist_ok=True)
