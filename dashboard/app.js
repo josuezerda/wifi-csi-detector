@@ -531,6 +531,505 @@ function updateVarianceChart(data) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Room View — Canvas 2D
+// ═══════════════════════════════════════════════════════════
+
+const roomState = {
+    personOpacity: 0,
+    personX: 0.5,
+    personY: 0.5,
+    breathOffset: 0,
+    walkPhase: 0,
+    wavePhase: 0,
+    signalParticles: [],
+};
+
+function initRoomView() {
+    const canvas = document.getElementById('room-canvas');
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width - 40;
+    canvas.height = 280;
+
+    // Generar partículas de señal
+    for (let i = 0; i < 20; i++) {
+        roomState.signalParticles.push({
+            x: Math.random(),
+            y: Math.random(),
+            speed: 0.002 + Math.random() * 0.003,
+            size: 1 + Math.random() * 2,
+            opacity: 0.1 + Math.random() * 0.3,
+        });
+    }
+
+    // Resize handler
+    window.addEventListener('resize', () => {
+        const r = canvas.parentElement.getBoundingClientRect();
+        canvas.width = r.width - 40;
+    });
+}
+
+function drawRoomView(data) {
+    const canvas = document.getElementById('room-canvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // ─── Room background (floor grid) ───
+    ctx.fillStyle = 'rgba(8, 16, 30, 0.9)';
+    ctx.fillRect(0, 0, W, H);
+
+    // Perspective grid
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.05)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 10; i++) {
+        const x = (i / 10) * W;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+        const y = (i / 10) * H;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+
+    // ─── Room walls ───
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.2)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(10, 10, W - 20, H - 20);
+
+    // Room label
+    ctx.fillStyle = 'rgba(136, 146, 164, 0.5)';
+    ctx.font = '10px Inter';
+    ctx.fillText('HABITACIÓN MONITOREADA', 20, 28);
+
+    // ─── ESP32 devices ───
+    const txX = 40, txY = H / 2;
+    const rxX = W - 40, rxY = H / 2;
+
+    // TX device
+    drawESP32(ctx, txX, txY, 'TX', '#00e5ff');
+    // RX device
+    drawESP32(ctx, rxX, rxY, 'RX', '#00e676');
+
+    // ─── WiFi signal waves ───
+    roomState.wavePhase += 0.04;
+    const numWaves = 5;
+    for (let i = 0; i < numWaves; i++) {
+        const phase = (roomState.wavePhase + i * 0.4) % 2;
+        const progress = phase / 2;
+        if (progress > 1) continue;
+        const opacity = 0.3 * (1 - progress);
+        const waveX = txX + (rxX - txX) * progress;
+
+        ctx.strokeStyle = `rgba(0, 229, 255, ${opacity})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(waveX, H / 2, 6 + progress * 20, 30 + progress * 40, 0, -Math.PI / 2, Math.PI / 2);
+        ctx.stroke();
+    }
+
+    // ─── Signal particles ───
+    roomState.signalParticles.forEach(p => {
+        p.x += p.speed;
+        if (p.x > 1) { p.x = 0; p.y = 0.2 + Math.random() * 0.6; }
+
+        const px = txX + (rxX - txX) * p.x;
+        const py = H * p.y;
+
+        ctx.fillStyle = `rgba(0, 229, 255, ${p.opacity})`;
+        ctx.beginPath();
+        ctx.arc(px, py, p.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // ─── Person silhouette ───
+    const presence = data?.presence || false;
+    const movement = data?.movement || false;
+    const targetOpacity = presence ? 1 : 0;
+    roomState.personOpacity += (targetOpacity - roomState.personOpacity) * 0.08;
+
+    if (roomState.personOpacity > 0.02) {
+        const cx = W * 0.5;
+        const cy = H * 0.48;
+
+        // Walking animation
+        if (movement) {
+            roomState.walkPhase += 0.08;
+            roomState.personX += Math.sin(roomState.walkPhase * 0.5) * 0.003;
+        }
+
+        // Breathing animation
+        roomState.breathOffset = Math.sin(Date.now() / 1500) * 2;
+
+        const opacity = roomState.personOpacity;
+        const personCx = cx + (roomState.personX - 0.5) * 100;
+
+        // Detection glow
+        const glowColor = movement ? 'rgba(255, 171, 0,' : 'rgba(255, 23, 68,';
+        const glowRadius = movement ? 80 : 60;
+        const grad = ctx.createRadialGradient(personCx, cy, 0, personCx, cy, glowRadius);
+        grad.addColorStop(0, glowColor + (0.15 * opacity) + ')');
+        grad.addColorStop(1, glowColor + '0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(personCx, cy, glowRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Signal disruption lines
+        if (presence) {
+            const disruptColor = movement ? 'rgba(255, 171, 0,' : 'rgba(255, 23, 68,';
+            for (let i = 0; i < 3; i++) {
+                const lineY = cy - 30 + i * 30;
+                ctx.strokeStyle = disruptColor + (0.3 * opacity) + ')';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 8]);
+                ctx.beginPath();
+                ctx.moveTo(personCx - 35, lineY);
+                ctx.lineTo(personCx + 35, lineY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        // Draw human figure
+        drawHumanSilhouette(ctx, personCx, cy, opacity, movement, roomState.breathOffset, roomState.walkPhase);
+    }
+
+    // ─── Activity label overlay ───
+    const badge = document.getElementById('room-activity-badge');
+    if (movement) {
+        badge.textContent = '🏃 Movimiento';
+        badge.style.background = 'var(--accent-amber-dim)';
+        badge.style.color = 'var(--accent-amber)';
+    } else if (presence) {
+        badge.textContent = '🧍 Presencia';
+        badge.style.background = 'var(--accent-red-dim)';
+        badge.style.color = 'var(--accent-red)';
+    } else {
+        badge.textContent = '✓ Vacío';
+        badge.style.background = 'var(--accent-green-dim)';
+        badge.style.color = 'var(--accent-green)';
+    }
+}
+
+function drawESP32(ctx, x, y, label, color) {
+    // PCB board
+    ctx.fillStyle = 'rgba(20, 40, 60, 0.9)';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    const bw = 28, bh = 40;
+    ctx.beginPath();
+    ctx.roundRect(x - bw/2, y - bh/2, bw, bh, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    // Antenna
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y - bh/2);
+    ctx.lineTo(x, y - bh/2 - 10);
+    ctx.stroke();
+
+    // LED indicator
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Label
+    ctx.fillStyle = color;
+    ctx.font = 'bold 9px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x, y + bh/2 + 14);
+    ctx.font = '7px Inter';
+    ctx.fillStyle = 'rgba(136, 146, 164, 0.6)';
+    ctx.fillText('ESP32', x, y + bh/2 + 24);
+    ctx.textAlign = 'start';
+}
+
+function drawHumanSilhouette(ctx, cx, cy, opacity, isMoving, breathOff, walkPhase) {
+    const scale = 0.9;
+    const color = isMoving ? `rgba(255, 171, 0, ${opacity})` : `rgba(255, 80, 100, ${opacity})`;
+    const outlineColor = isMoving ? `rgba(255, 171, 0, ${opacity * 0.3})` : `rgba(255, 80, 100, ${opacity * 0.3})`;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+
+    // Outer glow silhouette
+    ctx.fillStyle = outlineColor;
+    ctx.strokeStyle = 'transparent';
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(0, -52 + breathOff * 0.3, 16, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.beginPath();
+    ctx.ellipse(0, -15 + breathOff * 0.5, 18 + breathOff * 0.3, 30, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner solid silhouette
+    ctx.fillStyle = color;
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(0, -52 + breathOff * 0.3, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Neck
+    ctx.fillRect(-4, -42 + breathOff * 0.3, 8, 8);
+
+    // Torso
+    ctx.beginPath();
+    ctx.ellipse(0, -15 + breathOff * 0.5, 14 + breathOff * 0.3, 25, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Arms
+    const armSwing = isMoving ? Math.sin(walkPhase) * 15 : 0;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = color;
+
+    // Left arm
+    ctx.beginPath();
+    ctx.moveTo(-14, -30 + breathOff * 0.3);
+    ctx.lineTo(-22, -5 + armSwing);
+    ctx.stroke();
+
+    // Right arm
+    ctx.beginPath();
+    ctx.moveTo(14, -30 + breathOff * 0.3);
+    ctx.lineTo(22, -5 - armSwing);
+    ctx.stroke();
+
+    // Legs
+    const legSwing = isMoving ? Math.sin(walkPhase) * 12 : 0;
+    ctx.lineWidth = 7;
+
+    // Left leg
+    ctx.beginPath();
+    ctx.moveTo(-7, 8);
+    ctx.lineTo(-12 + legSwing, 50);
+    ctx.stroke();
+
+    // Right leg
+    ctx.beginPath();
+    ctx.moveTo(7, 8);
+    ctx.lineTo(12 - legSwing, 50);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Radar Sonar — Canvas 2D
+// ═══════════════════════════════════════════════════════════
+
+const radarState = {
+    sweepAngle: 0,
+    blips: [],
+    trailHistory: [],
+};
+
+function initRadar() {
+    const canvas = document.getElementById('radar-canvas');
+    canvas.width = 280;
+    canvas.height = 280;
+}
+
+function drawRadar(data) {
+    const canvas = document.getElementById('radar-canvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W / 2;
+    const cy = H / 2;
+    const maxR = Math.min(W, H) / 2 - 10;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // ─── Background ───
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
+    bgGrad.addColorStop(0, 'rgba(0, 20, 30, 0.8)');
+    bgGrad.addColorStop(1, 'rgba(0, 10, 15, 0.95)');
+    ctx.fillStyle = bgGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ─── Range rings ───
+    const ranges = [0.25, 0.5, 0.75, 1.0];
+    const rangeLabels = ['1m', '2m', '3m', '5m'];
+    ranges.forEach((r, i) => {
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.1)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, maxR * r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Range labels
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.25)';
+        ctx.font = '8px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.fillText(rangeLabels[i], cx, cy - maxR * r + 10);
+    });
+
+    // ─── Cross hairs ───
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.08)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(cx, cy - maxR); ctx.lineTo(cx, cy + maxR); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - maxR, cy); ctx.lineTo(cx + maxR, cy); ctx.stroke();
+
+    // Diagonal lines
+    ctx.beginPath(); ctx.moveTo(cx - maxR * 0.707, cy - maxR * 0.707); ctx.lineTo(cx + maxR * 0.707, cy + maxR * 0.707); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + maxR * 0.707, cy - maxR * 0.707); ctx.lineTo(cx - maxR * 0.707, cy + maxR * 0.707); ctx.stroke();
+
+    // ─── Sweep line ───
+    radarState.sweepAngle += 0.025;
+    const sweepAngle = radarState.sweepAngle % (Math.PI * 2);
+
+    // Sweep trail (fading arc)
+    const trailLength = Math.PI * 0.4;
+    for (let i = 0; i < 20; i++) {
+        const a = sweepAngle - (trailLength * i / 20);
+        const opacity = 0.15 * (1 - i / 20);
+        ctx.strokeStyle = `rgba(0, 229, 255, ${opacity})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(a) * maxR, cy + Math.sin(a) * maxR);
+        ctx.stroke();
+    }
+
+    // Main sweep line
+    const sweepGrad = ctx.createLinearGradient(cx, cy, cx + Math.cos(sweepAngle) * maxR, cy + Math.sin(sweepAngle) * maxR);
+    sweepGrad.addColorStop(0, 'rgba(0, 229, 255, 0.6)');
+    sweepGrad.addColorStop(1, 'rgba(0, 229, 255, 0.05)');
+    ctx.strokeStyle = sweepGrad;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(sweepAngle) * maxR, cy + Math.sin(sweepAngle) * maxR);
+    ctx.stroke();
+
+    // ─── Detection blips ───
+    const presence = data?.presence || false;
+    const movement = data?.movement || false;
+    const variance = data?.variance || 0;
+
+    // Generate/update blips based on presence
+    if (presence) {
+        // Add blip if sweep passes detection zone
+        const detectionAngle = Math.PI * 1.2; // Roughly in front
+        const angleDiff = Math.abs(((sweepAngle - detectionAngle + Math.PI) % (Math.PI * 2)) - Math.PI);
+        if (angleDiff < 0.15 && Math.random() > 0.5) {
+            const distance = 0.3 + Math.random() * 0.35;
+            const angleVar = detectionAngle + (Math.random() - 0.5) * 0.6;
+            radarState.blips.push({
+                angle: angleVar,
+                distance: distance,
+                opacity: 1,
+                size: movement ? 6 : 4,
+                color: movement ? [255, 171, 0] : [255, 23, 68],
+                born: Date.now(),
+            });
+        }
+    }
+
+    // Draw and age blips
+    radarState.blips = radarState.blips.filter(b => {
+        const age = (Date.now() - b.born) / 1000;
+        b.opacity = Math.max(0, 1 - age / 4);
+
+        if (b.opacity <= 0) return false;
+
+        const bx = cx + Math.cos(b.angle) * maxR * b.distance;
+        const by = cy + Math.sin(b.angle) * maxR * b.distance;
+
+        // Blip glow
+        const glowGrad = ctx.createRadialGradient(bx, by, 0, bx, by, b.size * 3);
+        glowGrad.addColorStop(0, `rgba(${b.color.join(',')}, ${b.opacity * 0.4})`);
+        glowGrad.addColorStop(1, `rgba(${b.color.join(',')}, 0)`);
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(bx, by, b.size * 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Blip core
+        ctx.fillStyle = `rgba(${b.color.join(',')}, ${b.opacity})`;
+        ctx.beginPath();
+        ctx.arc(bx, by, b.size * b.opacity, 0, Math.PI * 2);
+        ctx.fill();
+
+        return true;
+    });
+
+    // ─── Center point ───
+    ctx.fillStyle = presence ? (movement ? 'rgba(255, 171, 0, 0.8)' : 'rgba(255, 23, 68, 0.8)') : 'rgba(0, 229, 255, 0.5)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Center label
+    ctx.fillStyle = 'rgba(136, 146, 164, 0.6)';
+    ctx.font = '8px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText('SENSOR', cx, cy + 16);
+
+    // ─── Status text ───
+    ctx.fillStyle = presence ? (movement ? '#ffab00' : '#ff1744') : '#00e5ff';
+    ctx.font = 'bold 10px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+        movement ? '⚡ MOVIMIENTO DETECTADO' : presence ? '● PRESENCIA DETECTADA' : '○ ÁREA LIMPIA',
+        cx, H - 8
+    );
+
+    // ─── Outer ring ───
+    ctx.strokeStyle = presence ? (movement ? 'rgba(255, 171, 0, 0.3)' : 'rgba(255, 23, 68, 0.3)') : 'rgba(0, 229, 255, 0.15)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Cardinal labels
+    const cardinals = [['N', -Math.PI/2], ['E', 0], ['S', Math.PI/2], ['O', Math.PI]];
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.3)';
+    ctx.font = 'bold 9px Inter';
+    cardinals.forEach(([l, a]) => {
+        ctx.fillText(l, cx + Math.cos(a) * (maxR + 5) - 3, cy + Math.sin(a) * (maxR + 5) + 3);
+    });
+
+    ctx.textAlign = 'start';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Visual Animation Loop (Room + Radar at 30fps)
+// ═══════════════════════════════════════════════════════════
+
+let visualAnimFrame = null;
+
+function startVisualLoop() {
+    let lastTime = 0;
+    const targetInterval = 1000 / 30; // 30 FPS
+
+    function loop(timestamp) {
+        if (timestamp - lastTime >= targetInterval) {
+            lastTime = timestamp;
+            const data = state.lastFrame;
+            drawRoomView(data);
+            drawRadar(data);
+        }
+        visualAnimFrame = requestAnimationFrame(loop);
+    }
+    visualAnimFrame = requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════════════════
 // Heatmap — Canvas 2D
 // ═══════════════════════════════════════════════════════════
 
@@ -1067,8 +1566,11 @@ function init() {
     initAmplitudeChart();
     initVarianceChart();
     initHeatmap();
+    initRoomView();
+    initRadar();
     initSettings();
     startFPSCounter();
+    startVisualLoop();
 
     // Try WebSocket first, fallback to local simulator
     connectWithFallback();

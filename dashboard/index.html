@@ -134,6 +134,35 @@
             </div>
         </section>
 
+        <!-- ─── Visual Row: Room + Radar ───────────────── -->
+        <section class="visual-row">
+            <!-- Vista de Habitación -->
+            <div class="card room-card">
+                <div class="card-header">
+                    <h3>🏠 Vista de Habitación</h3>
+                    <div class="card-actions">
+                        <span class="badge" id="room-activity-badge">Monitoreando</span>
+                    </div>
+                </div>
+                <div class="room-container" id="room-container">
+                    <canvas id="room-canvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Radar Sonar -->
+            <div class="card radar-card">
+                <div class="card-header">
+                    <h3>📡 Radar de Detección</h3>
+                    <div class="card-actions">
+                        <span class="badge" id="radar-range-badge">Rango: 5m</span>
+                    </div>
+                </div>
+                <div class="radar-container">
+                    <canvas id="radar-canvas"></canvas>
+                </div>
+            </div>
+        </section>
+
         <!-- ─── Charts Row ─────────────────────────────── -->
         <section class="charts-row">
             <!-- Gráfico de Amplitud (principal) -->
