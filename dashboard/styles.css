@@ -75,7 +75,19 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Ambient background glow - disabled for performance */
+/* Ambient background glow */
+body::before {
+    content: '';
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(0, 229, 255, 0.04) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
 
 /* ─── Sidebar Navigation ─────────────────────────────────── */
 .sidebar {
@@ -1321,7 +1333,7 @@ body {
 }
 
 .card {
-    animation: none;
+    animation: fadeIn 0.5s ease-out;
 }
 
 .top-row .card:nth-child(1) { animation-delay: 0.05s; }

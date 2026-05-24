@@ -54,7 +54,7 @@ const CONFIG = {
     maxDataPoints: 120,       // Puntos en gráfico de varianza
     heatmapHistory: 80,       // Columnas del heatmap
     numSubcarriers: 64,
-    chartUpdateRate: 500,     // ms entre actualizaciones de gráficos
+    chartUpdateRate: 100,     // ms entre actualizaciones de gráficos
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -168,27 +168,11 @@ function handleCSIFrame(data) {
     state.frameCount++;
     state.fpsCounter++;
 
-    // Always update presence indicator (lightweight DOM)
     updatePresenceUI(data);
     updateStatsUI(data);
-
-    // Draw canvas visuals every frame (4fps from simulator = OK)
-    const detPage = document.getElementById('page-detection');
-    if (detPage && detPage.classList.contains('active')) {
-        drawRoomView(data);
-        drawRadar(data);
-    }
-
-    // Throttle heavy chart updates (every 4th frame = ~1/sec)
-    if (state.frameCount % 4 === 0) {
-        updateAmplitudeChart(data);
-        updateVarianceChart(data);
-    }
-    // Throttle heatmap (every 6th frame = ~0.7/sec)
-    if (state.frameCount % 6 === 0) {
-        updateHeatmap(data);
-    }
-    // Events only on detection changes
+    updateAmplitudeChart(data);
+    updateVarianceChart(data);
+    updateHeatmap(data);
     updateEventsFromFrame(data);
 }
 
@@ -361,7 +345,7 @@ function initAmplitudeChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: { duration: 0 },
+            animation: { duration: 80 },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -600,8 +584,8 @@ function initRoomView() {
     canvas.width = rect.width - 40;
     canvas.height = 280;
 
-    // Generar partículas de señal (reduced for performance)
-    for (let i = 0; i < 8; i++) {
+    // Generar partículas de señal
+    for (let i = 0; i < 20; i++) {
         roomState.signalParticles.push({
             x: Math.random(),
             y: Math.random(),
@@ -655,8 +639,8 @@ function drawRoomView(data, targetCanvas) {
     drawESP32(ctx, rxX, rxY, 'RX', '#00e676');
 
     // ─── WiFi signal waves ───
-    roomState.wavePhase += 0.06;
-    const numWaves = 3;
+    roomState.wavePhase += 0.04;
+    const numWaves = 5;
     for (let i = 0; i < numWaves; i++) {
         const phase = (roomState.wavePhase + i * 0.4) % 2;
         const progress = phase / 2;
@@ -1048,8 +1032,27 @@ function drawRadar(data, targetCanvas) {
     ctx.textAlign = 'start';
 }
 
+// ═══════════════════════════════════════════════════════════
+// Visual Animation Loop (Room + Radar at 30fps)
+// ═══════════════════════════════════════════════════════════
 
-// Visual loop removed — room+radar now draw on data arrival in handleCSIFrame
+let visualAnimFrame = null;
+
+function startVisualLoop() {
+    let lastTime = 0;
+    const targetInterval = 1000 / 30; // 30 FPS
+
+    function loop(timestamp) {
+        if (timestamp - lastTime >= targetInterval) {
+            lastTime = timestamp;
+            const data = state.lastFrame;
+            drawRoomView(data);
+            drawRadar(data);
+        }
+        visualAnimFrame = requestAnimationFrame(loop);
+    }
+    visualAnimFrame = requestAnimationFrame(loop);
+}
 
 
 function drawHeatmapToCanvas(target) {
@@ -1584,7 +1587,7 @@ function startLocalSimulator() {
     localSimInterval = setInterval(() => {
         const frame = localSimulator.generateFrame();
         handleCSIFrame(frame);
-    }, 250); // 4 FPS (optimized)
+    }, 100); // 10 FPS
 }
 
 function stopLocalSimulator() {
@@ -1673,6 +1676,7 @@ function init() {
     initSettings();
     initExpandButtons();
     startFPSCounter();
+    startVisualLoop();
 
     // Try WebSocket first, fallback to local simulator
     connectWithFallback();
