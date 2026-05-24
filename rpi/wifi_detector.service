@@ -1,0 +1,25 @@
+[Unit]
+Description=WiFi CSI Presence Detector
+Documentation=https://github.com/TU_USUARIO/wifi-csi-detector
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/wifi-csi-detector/backend
+ExecStart=/home/pi/wifi-csi-detector/venv/bin/python server.py --mode demo --http-port 8080 --ws-port 8765
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Entorno
+Environment=PYTHONUNBUFFERED=1
+
+# Límites de seguridad
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/pi/wifi-csi-detector
+
+[Install]
+WantedBy=multi-user.target
