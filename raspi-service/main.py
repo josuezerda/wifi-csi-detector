@@ -335,7 +335,7 @@ def heartbeat_loop(cameras_count_fn):
                 "uptime_seconds": get_uptime(),
                 "ip_address": get_local_ip(),
                 "version": "1.0.0",
-                "last_seen": datetime.now().isoformat(),
+                "last_seen": datetime.utcnow().isoformat(),
             }
             
             headers = {
