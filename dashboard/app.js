@@ -794,8 +794,274 @@ function startFPSCounter() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Embedded CSI Simulator (runs client-side for static deploy)
+// ═══════════════════════════════════════════════════════════
+
+class ClientCSISimulator {
+    constructor() {
+        this.numSubcarriers = 64;
+        this.states = ['empty', 'entering', 'moving', 'still', 'breathing', 'leaving'];
+        this.stateIndex = 0;
+        this.state = 'empty';
+        this.stateStart = Date.now();
+        this.stateDuration = this._randRange(5000, 10000);
+        this.frameCount = 0;
+        this.startTime = Date.now();
+        this.breathPhase = 0;
+        this.movementPhase = 0;
+        this.baseAmplitudes = this._genBaseProfile();
+
+        // Detection state
+        this.amplitudeHistory = [];
+        this.windowSize = 50;
+        this.smoothedVariance = 0;
+        this.detectionCount = 0;
+        this.presenceFrames = 0;
+        this.lastPresence = false;
+        this.events = [];
+    }
+
+    _randRange(min, max) { return min + Math.random() * (max - min); }
+    _gaussian() { return Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * Math.random()); }
+
+    _genBaseProfile() {
+        const p = [];
+        for (let i = 0; i < this.numSubcarriers; i++) {
+            const x = (i / this.numSubcarriers) * 2 - 1;
+            p.push(20 + 8 * Math.exp(-2 * x * x) + this._gaussian() * 1.5);
+        }
+        return p;
+    }
+
+    _checkTransition() {
+        if (Date.now() - this.stateStart >= this.stateDuration) {
+            this.stateIndex = (this.stateIndex + 1) % this.states.length;
+            this.state = this.states[this.stateIndex];
+            this.stateStart = Date.now();
+            const durations = { empty: [6000,12000], entering: [2000,3500], moving: [4000,8000], still: [5000,9000], breathing: [6000,12000], leaving: [2000,3500] };
+            const d = durations[this.state] || [5000,10000];
+            this.stateDuration = this._randRange(d[0], d[1]);
+        }
+    }
+
+    generateFrame() {
+        this._checkTransition();
+        this.frameCount++;
+        const progress = Math.min(1, (Date.now() - this.stateStart) / this.stateDuration);
+        const dt = 0.1;
+
+        const amplitudes = [];
+        const perturbation = new Array(this.numSubcarriers).fill(0);
+        const center = this.numSubcarriers / 2;
+
+        if (this.state === 'entering') {
+            for (let i = 0; i < this.numSubcarriers; i++) {
+                const d = (i - center) / 10;
+                perturbation[i] = 6 * progress * 0.6 * Math.exp(-0.5 * d * d);
+            }
+        } else if (this.state === 'moving') {
+            this.movementPhase += dt * this._randRange(2, 5);
+            const intensity = 0.8 + 0.2 * Math.sin(this.movementPhase);
+            for (let i = 0; i < this.numSubcarriers; i++) {
+                const d = (i - center + this._randRange(-5,5)) / 10;
+                perturbation[i] = 6 * intensity * Math.exp(-0.5 * d * d) + this._gaussian() * 3;
+            }
+        } else if (this.state === 'still') {
+            for (let i = 0; i < this.numSubcarriers; i++) {
+                const d = (i - center) / 10;
+                perturbation[i] = 3 * Math.exp(-0.5 * d * d) + this._gaussian() * 0.8;
+            }
+        } else if (this.state === 'breathing') {
+            this.breathPhase += dt * 2 * Math.PI * 0.3;
+            const breathEffect = 2.5 * Math.sin(this.breathPhase);
+            for (let i = 0; i < this.numSubcarriers; i++) {
+                const d = (i - center) / 15;
+                const mask = Math.exp(-0.5 * d * d);
+                perturbation[i] = 2.5 * Math.exp(-0.5 * ((i-center)/10)**2) + breathEffect * mask;
+            }
+        } else if (this.state === 'leaving') {
+            for (let i = 0; i < this.numSubcarriers; i++) {
+                const d = (i - center) / 10;
+                perturbation[i] = 3 * (1 - progress) * Math.exp(-0.5 * d * d);
+            }
+        }
+
+        for (let i = 0; i < this.numSubcarriers; i++) {
+            amplitudes.push(Math.max(1, Math.min(50, this.baseAmplitudes[i] + this._gaussian() * 1.2 + perturbation[i])));
+        }
+
+        // Compute variance
+        this.amplitudeHistory.push([...amplitudes]);
+        if (this.amplitudeHistory.length > this.windowSize) this.amplitudeHistory.shift();
+
+        let variance = 0;
+        if (this.amplitudeHistory.length >= 3) {
+            const variances = [];
+            for (let s = 0; s < this.numSubcarriers; s++) {
+                let sum = 0, sumSq = 0;
+                for (const row of this.amplitudeHistory) {
+                    sum += row[s]; sumSq += row[s] * row[s];
+                }
+                const n = this.amplitudeHistory.length;
+                variances.push(sumSq/n - (sum/n)**2);
+            }
+            variance = variances.reduce((a,b) => a+b, 0) / variances.length;
+        }
+        this.smoothedVariance = 0.3 * variance + 0.7 * this.smoothedVariance;
+
+        const threshold = parseFloat(document.getElementById('setting-threshold')?.value || 12);
+        const sensitivity = parseFloat(document.getElementById('setting-sensitivity')?.value || 0.7);
+        const movThreshold = parseFloat(document.getElementById('setting-movement')?.value || 25);
+        const effThreshold = threshold * (1.5 - sensitivity);
+        const effMovThreshold = movThreshold * (1.5 - sensitivity);
+
+        const presence = this.smoothedVariance > effThreshold;
+        const movement = this.smoothedVariance > effMovThreshold;
+
+        if (presence && !this.lastPresence) {
+            this.detectionCount++;
+            this.events.push({ timestamp: Date.now()/1000, type: 'presence_start', variance: this.smoothedVariance });
+        } else if (!presence && this.lastPresence) {
+            this.events.push({ timestamp: Date.now()/1000, type: 'presence_end', variance: this.smoothedVariance });
+        }
+        if (this.events.length > 20) this.events.shift();
+        this.lastPresence = presence;
+        if (presence) this.presenceFrames++;
+
+        const rssi = -55 + (presence ? this._randRange(-8,-3) : 0) + this._randRange(-2,2);
+        const uptime = (Date.now() - this.startTime) / 1000;
+
+        return {
+            type: 'csi_frame',
+            timestamp: Date.now() / 1000,
+            frame_number: this.frameCount,
+            amplitudes: amplitudes,
+            phases: amplitudes.map(() => this._randRange(-Math.PI, Math.PI)),
+            rssi: Math.round(rssi),
+            noise_floor: -95 + this._randRange(-1,1),
+            variance: Math.round(this.smoothedVariance * 100) / 100,
+            raw_variance: Math.round(variance * 100) / 100,
+            subcarrier_variance: [],
+            baseline_deviation: 0,
+            presence: presence,
+            movement: movement,
+            activity_level: movement ? 'movimiento' : presence ? 'presencia' : 'vacío',
+            presence_label: movement ? '🔴 Movimiento' : presence ? '🟠 Presencia' : '🟢 Sin Presencia',
+            threshold: Math.round(effThreshold * 100) / 100,
+            movement_threshold: Math.round(effMovThreshold * 100) / 100,
+            stats: {
+                avg_amplitude: Math.round(amplitudes.reduce((a,b)=>a+b,0)/amplitudes.length * 100)/100,
+                max_amplitude: Math.round(Math.max(...amplitudes) * 100)/100,
+                max_variance: Math.round(this.smoothedVariance * 100)/100,
+                detection_count: this.detectionCount,
+                total_frames: this.frameCount,
+                presence_percentage: Math.round(100 * this.presenceFrames / Math.max(1, this.frameCount) * 10)/10,
+                uptime: Math.round(uptime * 10)/10,
+            },
+            events: this.events.slice(-10),
+            sim_state: this.state,
+        };
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Local Simulator Loop (fallback when no WebSocket)
+// ═══════════════════════════════════════════════════════════
+
+let localSimulator = null;
+let localSimInterval = null;
+
+function startLocalSimulator() {
+    if (localSimInterval) return;
+
+    localSimulator = new ClientCSISimulator();
+    updateConnectionStatus('connected', 'Demo Local');
+    addEvent('info', '🎮 Simulador local activado (sin servidor)');
+
+    document.getElementById('info-server').textContent = 'Local (navegador)';
+
+    localSimInterval = setInterval(() => {
+        const frame = localSimulator.generateFrame();
+        handleCSIFrame(frame);
+    }, 100); // 10 FPS
+}
+
+function stopLocalSimulator() {
+    if (localSimInterval) {
+        clearInterval(localSimInterval);
+        localSimInterval = null;
+    }
+    localSimulator = null;
+}
+
+// ═══════════════════════════════════════════════════════════
 // Initialize
 // ═══════════════════════════════════════════════════════════
+
+let wsAttempts = 0;
+const MAX_WS_ATTEMPTS = 2;
+
+function connectWithFallback() {
+    updateConnectionStatus('connecting', 'Conectando...');
+
+    try {
+        state.ws = new WebSocket(CONFIG.wsUrl);
+    } catch (e) {
+        wsAttempts++;
+        if (wsAttempts >= MAX_WS_ATTEMPTS) {
+            startLocalSimulator();
+        } else {
+            setTimeout(connectWithFallback, CONFIG.reconnectInterval);
+        }
+        return;
+    }
+
+    const timeout = setTimeout(() => {
+        if (state.ws.readyState !== WebSocket.OPEN) {
+            state.ws.close();
+            wsAttempts++;
+            if (wsAttempts >= MAX_WS_ATTEMPTS) {
+                startLocalSimulator();
+            } else {
+                setTimeout(connectWithFallback, CONFIG.reconnectInterval);
+            }
+        }
+    }, 3000);
+
+    state.ws.onopen = () => {
+        clearTimeout(timeout);
+        wsAttempts = 0;
+        state.connected = true;
+        stopLocalSimulator();
+        updateConnectionStatus('connected', 'Conectado al servidor');
+        addEvent('info', 'Conectado al servidor Python');
+    };
+
+    state.ws.onclose = () => {
+        clearTimeout(timeout);
+        state.connected = false;
+        wsAttempts++;
+        if (wsAttempts >= MAX_WS_ATTEMPTS) {
+            startLocalSimulator();
+        } else {
+            updateConnectionStatus('disconnected', 'Desconectado');
+            setTimeout(connectWithFallback, CONFIG.reconnectInterval);
+        }
+    };
+
+    state.ws.onerror = () => {
+        state.connected = false;
+    };
+
+    state.ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            handleMessage(data);
+        } catch (e) {
+            console.error('Error parsing message:', e);
+        }
+    };
+}
 
 function init() {
     initAmplitudeChart();
@@ -803,7 +1069,9 @@ function init() {
     initHeatmap();
     initSettings();
     startFPSCounter();
-    connectWebSocket();
+
+    // Try WebSocket first, fallback to local simulator
+    connectWithFallback();
 
     addEvent('info', 'Dashboard inicializado');
 }
