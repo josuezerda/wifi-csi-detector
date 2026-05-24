@@ -168,17 +168,24 @@ function handleCSIFrame(data) {
     state.frameCount++;
     state.fpsCounter++;
 
-    // Always update presence indicator (lightweight)
+    // Always update presence indicator (lightweight DOM)
     updatePresenceUI(data);
     updateStatsUI(data);
 
-    // Throttle heavy chart updates (every 3rd frame)
-    if (state.frameCount % 3 === 0) {
+    // Draw canvas visuals every frame (4fps from simulator = OK)
+    const detPage = document.getElementById('page-detection');
+    if (detPage && detPage.classList.contains('active')) {
+        drawRoomView(data);
+        drawRadar(data);
+    }
+
+    // Throttle heavy chart updates (every 4th frame = ~1/sec)
+    if (state.frameCount % 4 === 0) {
         updateAmplitudeChart(data);
         updateVarianceChart(data);
     }
-    // Throttle heatmap (every 5th frame)
-    if (state.frameCount % 5 === 0) {
+    // Throttle heatmap (every 6th frame = ~0.7/sec)
+    if (state.frameCount % 6 === 0) {
         updateHeatmap(data);
     }
     // Events only on detection changes
@@ -593,8 +600,8 @@ function initRoomView() {
     canvas.width = rect.width - 40;
     canvas.height = 280;
 
-    // Generar partículas de señal
-    for (let i = 0; i < 20; i++) {
+    // Generar partículas de señal (reduced for performance)
+    for (let i = 0; i < 8; i++) {
         roomState.signalParticles.push({
             x: Math.random(),
             y: Math.random(),
@@ -603,12 +610,6 @@ function initRoomView() {
             opacity: 0.1 + Math.random() * 0.3,
         });
     }
-
-    // Resize handler
-    window.addEventListener('resize', () => {
-        const r = canvas.parentElement.getBoundingClientRect();
-        canvas.width = r.width - 40;
-    });
 }
 
 function drawRoomView(data, targetCanvas) {
@@ -654,8 +655,8 @@ function drawRoomView(data, targetCanvas) {
     drawESP32(ctx, rxX, rxY, 'RX', '#00e676');
 
     // ─── WiFi signal waves ───
-    roomState.wavePhase += 0.04;
-    const numWaves = 5;
+    roomState.wavePhase += 0.06;
+    const numWaves = 3;
     for (let i = 0; i < numWaves; i++) {
         const phase = (roomState.wavePhase + i * 0.4) % 2;
         const progress = phase / 2;
@@ -724,12 +725,10 @@ function drawRoomView(data, targetCanvas) {
                 const lineY = cy - 30 + i * 30;
                 ctx.strokeStyle = disruptColor + (0.3 * opacity) + ')';
                 ctx.lineWidth = 1;
-                ctx.setLineDash([4, 8]);
                 ctx.beginPath();
                 ctx.moveTo(personCx - 35, lineY);
                 ctx.lineTo(personCx + 35, lineY);
                 ctx.stroke();
-                ctx.setLineDash([]);
             }
         }
 
@@ -1049,51 +1048,9 @@ function drawRadar(data, targetCanvas) {
     ctx.textAlign = 'start';
 }
 
-// ═══════════════════════════════════════════════════════════
-// Visual Animation Loop (Room + Radar at 30fps)
-// ═══════════════════════════════════════════════════════════
 
-let visualAnimFrame = null;
+// Visual loop removed — room+radar now draw on data arrival in handleCSIFrame
 
-function startVisualLoop() {
-    let lastTime = 0;
-    const targetInterval = 1000 / 15; // 15 FPS (optimized)
-
-    function loop(timestamp) {
-        if (timestamp - lastTime >= targetInterval) {
-            lastTime = timestamp;
-            // Only render if detection page is active
-            const detPage = document.getElementById('page-detection');
-            if (!detPage || !detPage.classList.contains('active')) {
-                visualAnimFrame = requestAnimationFrame(loop);
-                return;
-            }
-            const data = state.lastFrame;
-            drawRoomView(data);
-            drawRadar(data);
-
-            // Also render to fullscreen canvas if active
-            if (fullscreenCanvas && fullscreenSourceId) {
-                if (fullscreenSourceId === 'room-canvas') {
-                    drawRoomView(data, fullscreenCanvas);
-                } else if (fullscreenSourceId === 'radar-canvas') {
-                    drawRadar(data, fullscreenCanvas);
-                } else if (fullscreenSourceId === 'heatmap-canvas') {
-                    drawHeatmapToCanvas(fullscreenCanvas);
-                } else if (fullscreenSourceId.includes('chart')) {
-                    const src = document.getElementById(fullscreenSourceId);
-                    if (src) {
-                        const fsCtx = fullscreenCanvas.getContext('2d');
-                        fsCtx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
-                        fsCtx.drawImage(src, 0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
-                    }
-                }
-            }
-        }
-        visualAnimFrame = requestAnimationFrame(loop);
-    }
-    visualAnimFrame = requestAnimationFrame(loop);
-}
 
 function drawHeatmapToCanvas(target) {
     const source = document.getElementById('heatmap-canvas');
@@ -1716,7 +1673,6 @@ function init() {
     initSettings();
     initExpandButtons();
     startFPSCounter();
-    startVisualLoop();
 
     // Try WebSocket first, fallback to local simulator
     connectWithFallback();
