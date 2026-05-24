@@ -1947,22 +1947,28 @@ async function loadPersonsPage() {
         return;
     }
 
-    // Load photo counts
-    const { data: photos } = await window._supabase.from('home_person_photos').select('person_id');
+    // Load photos with paths
+    const { data: photos } = await window._supabase.from('home_person_photos').select('person_id, storage_path');
     const photoCounts = {};
-    (photos || []).forEach(p => { photoCounts[p.person_id] = (photoCounts[p.person_id] || 0) + 1; });
+    const photoUrls = {};
+    const STORAGE_BASE = window._supabase.supabaseUrl + '/storage/v1/object/public/face-photos/';
+    (photos || []).forEach(p => {
+        photoCounts[p.person_id] = (photoCounts[p.person_id] || 0) + 1;
+        if (!photoUrls[p.person_id]) photoUrls[p.person_id] = STORAGE_BASE + p.storage_path;
+    });
 
     const emojiMap = { familia: '👨‍👩‍👧‍👦', empleada: '🏠', niñera: '👶', visita: '👋' };
     grid.innerHTML = pList.map(p => {
         const pc = photoCounts[p.id] || 0;
         const photoColor = pc > 0 ? 'var(--accent-green)' : 'var(--text-dimmed)';
         const photoBg = pc > 0 ? 'var(--accent-green-dim)' : 'var(--bg-input)';
+        const avatarHtml = photoUrls[p.id]
+            ? `<img src="${photoUrls[p.id]}" alt="${p.name}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;flex-shrink:0;border:2px solid ${p.is_active ? 'var(--accent-green)' : 'var(--border)'}">`
+            : `<div style="width:48px;height:48px;border-radius:12px;background:${p.is_active ? 'var(--accent-green-dim)' : 'var(--bg-input)'};display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">${emojiMap[p.relationship] || '👤'}</div>`;
         return `
         <div class="card" style="padding:16px">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-                <div style="width:48px;height:48px;border-radius:12px;background:${p.is_active ? 'var(--accent-green-dim)' : 'var(--bg-input)'};display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">
-                    ${emojiMap[p.relationship] || '👤'}
-                </div>
+                ${avatarHtml}
                 <div style="flex:1;min-width:0">
                     <strong style="color:var(--text-primary);font-size:0.9rem">${p.name}</strong>
                     <p style="font-size:0.7rem;color:var(--text-muted);text-transform:capitalize">${p.relationship || 'Sin categoría'}</p>
