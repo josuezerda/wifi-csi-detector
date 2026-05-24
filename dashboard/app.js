@@ -1330,36 +1330,21 @@ function openFullscreen(canvasId) {
     fullscreenCanvas = document.createElement('canvas');
     fullscreenCanvas.id = 'fullscreen-canvas';
 
-    const dpr = window.devicePixelRatio || 1;
-    const availW = window.innerWidth * 0.92;
-    const availH = window.innerHeight * 0.85;
+    const availW = Math.floor(window.innerWidth * 0.92);
+    const availH = Math.floor(window.innerHeight * 0.85);
 
     if (canvasId === 'radar-canvas') {
-        // Radar must be square
         const size = Math.min(availW, availH);
-        fullscreenCanvas.width = Math.round(size * dpr);
-        fullscreenCanvas.height = Math.round(size * dpr);
+        fullscreenCanvas.width = size;
+        fullscreenCanvas.height = size;
         fullscreenCanvas.style.width = size + 'px';
         fullscreenCanvas.style.height = size + 'px';
-    } else if (canvasId === 'heatmap-canvas') {
-        // Heatmap: wide aspect
-        const w = availW;
-        const h = availH * 0.7;
-        fullscreenCanvas.width = Math.round(w * dpr);
-        fullscreenCanvas.height = Math.round(h * dpr);
-        fullscreenCanvas.style.width = w + 'px';
-        fullscreenCanvas.style.height = h + 'px';
     } else {
-        // Room view and charts: fill available space
-        fullscreenCanvas.width = Math.round(availW * dpr);
-        fullscreenCanvas.height = Math.round(availH * dpr);
+        fullscreenCanvas.width = availW;
+        fullscreenCanvas.height = availH;
         fullscreenCanvas.style.width = availW + 'px';
         fullscreenCanvas.style.height = availH + 'px';
     }
-
-    // Scale context for HiDPI
-    const ctx = fullscreenCanvas.getContext('2d');
-    ctx.scale(dpr, dpr);
 
     body.appendChild(fullscreenCanvas);
     modal.classList.add('active');

@@ -3,483 +3,239 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WiFi CSI — Live Console</title>
+    <title>wifi-csi-detector — terminal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-        :root {
-            --green: #00ff41;
-            --cyan: #00e5ff;
-            --amber: #ffab00;
-            --red: #ff1744;
-            --dim: rgba(0,255,65,0.15);
-            --bg: #0a0e14;
-        }
-
         body {
-            background: var(--bg);
-            color: var(--green);
-            font-family: 'JetBrains Mono', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            font-family: 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.5;
             min-height: 100vh;
             overflow: hidden;
         }
 
-        /* Matrix rain background */
-        #matrix-canvas {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
-            opacity: 0.12;
-        }
-
-        /* Header */
-        .console-header {
+        /* Terminal window chrome */
+        .terminal-chrome {
             position: fixed;
             top: 0; left: 0; right: 0;
-            height: 40px;
-            background: rgba(10, 14, 20, 0.95);
-            border-bottom: 1px solid rgba(0,255,65,0.15);
+            height: 32px;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            z-index: 10;
-            backdrop-filter: blur(10px);
-        }
-
-        .console-title {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .console-title .dots {
-            display: flex;
-            gap: 6px;
-        }
-
-        .console-title .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-        }
-
-        .dot-red { background: #ff5f56; }
-        .dot-yellow { background: #ffbd2e; }
-        .dot-green { background: #27c93f; }
-
-        .console-stats {
-            display: flex;
-            gap: 24px;
-            font-size: 10px;
-            color: rgba(0,255,65,0.5);
-        }
-
-        .console-stats span { display: flex; align-items: center; gap: 6px; }
-        .stat-live { color: var(--green); animation: blink 1s infinite; }
-
-        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-
-        /* Main layout */
-        .console-body {
-            position: fixed;
-            top: 40px; left: 0; right: 0; bottom: 0;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
-            gap: 1px;
-            background: rgba(0,255,65,0.05);
-            z-index: 1;
-        }
-
-        .console-panel {
-            background: rgba(10, 14, 20, 0.95);
-            padding: 8px 12px;
-            overflow: hidden;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 6px;
-            border-bottom: 1px solid rgba(0,255,65,0.1);
-            margin-bottom: 6px;
-            flex-shrink: 0;
-        }
-
-        .panel-title {
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--cyan);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-
-        .panel-badge {
-            font-size: 9px;
-            padding: 2px 8px;
-            border-radius: 10px;
-            background: var(--dim);
-            color: var(--green);
-        }
-
-        .panel-content {
-            flex: 1;
-            overflow: hidden;
-            position: relative;
-        }
-
-        /* Data stream panel */
-        .data-stream {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            overflow: hidden;
-        }
-
-        .data-line {
-            font-size: 10px;
-            line-height: 1.6;
-            white-space: nowrap;
-            animation: lineSlideIn 0.15s ease-out;
-            opacity: 0.85;
-        }
-
-        .data-line:last-child { opacity: 1; }
-
-        @keyframes lineSlideIn {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        .tag-time { color: rgba(0,255,65,0.4); }
-        .tag-type { color: var(--cyan); font-weight: 600; }
-        .tag-data { color: var(--green); }
-        .tag-key { color: var(--amber); }
-        .tag-value { color: #bb86fc; }
-        .tag-alert { color: var(--red); font-weight: 700; }
-        .tag-ok { color: #00e676; }
-        .tag-comment { color: rgba(0,255,65,0.3); font-style: italic; }
-        .tag-bracket { color: rgba(0,229,255,0.6); }
-        .tag-num { color: #ff80ab; }
-
-        /* Processing pipeline */
-        .pipeline-step {
-            font-size: 10px;
-            line-height: 1.8;
-            display: flex;
+            padding: 0 12px;
             gap: 8px;
+            z-index: 10;
+            -webkit-app-region: drag;
         }
 
-        .pipeline-icon { flex-shrink: 0; }
-        .pipeline-text { flex: 1; }
+        .chrome-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .chrome-dot.r { background: #ff5f57; }
+        .chrome-dot.y { background: #febc2e; }
+        .chrome-dot.g { background: #28c840; }
 
-        .progress-bar {
-            height: 3px;
-            background: rgba(0,255,65,0.1);
-            border-radius: 2px;
-            margin: 4px 0;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: var(--green);
-            border-radius: 2px;
-            transition: width 0.3s;
-            box-shadow: 0 0 8px var(--green);
-        }
-
-        /* Detection visualization */
-        .detection-display {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            gap: 12px;
-        }
-
-        .detection-ascii {
-            font-size: 9px;
-            line-height: 1.2;
+        .chrome-title {
+            flex: 1;
             text-align: center;
-            transition: color 0.5s;
+            font-size: 11px;
+            color: #8b949e;
+            letter-spacing: 0.02em;
         }
 
-        .detection-status {
-            font-size: 14px;
-            font-weight: 700;
-            text-align: center;
+        /* Main terminal area */
+        .terminal {
+            position: fixed;
+            top: 32px; left: 0; right: 0; bottom: 0;
+            padding: 8px 12px;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
-        .detection-metrics {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4px 16px;
-            font-size: 9px;
+        /* Line styles */
+        .line {
+            white-space: pre-wrap;
+            word-break: break-all;
+            min-height: 18px;
         }
 
-        .detection-metrics .label { color: rgba(0,255,65,0.4); }
-        .detection-metrics .val { color: var(--green); text-align: right; font-weight: 600; }
+        .line.new { animation: fadeIn 0.1s ease-out; }
 
-        /* Network panel */
-        .net-line {
-            font-size: 10px;
-            line-height: 1.7;
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
-        .net-arrow { color: var(--cyan); }
-        .net-url { color: var(--amber); }
-        .net-status-ok { color: #00e676; }
-        .net-status-err { color: var(--red); }
-        .net-bytes { color: rgba(0,255,65,0.5); }
+        /* Colors matching real terminal */
+        .prompt { color: #7ee787; font-weight: 500; }
+        .path { color: #79c0ff; }
+        .cmd { color: #f0f6fc; font-weight: 500; }
+        .flag { color: #d2a8ff; }
+        .str { color: #a5d6ff; }
+        .num { color: #ffa657; }
+        .comment { color: #484f58; font-style: italic; }
+        .err { color: #f85149; }
+        .warn { color: #d29922; }
+        .ok { color: #3fb950; }
+        .dim { color: #484f58; }
+        .cyan { color: #39d353; }
+        .blue { color: #58a6ff; }
+        .key { color: #ff7b72; }
+        .bracket { color: #8b949e; }
+        .time { color: #484f58; }
+        .bold { font-weight: 600; }
+        .separator { color: #30363d; }
+
+        /* Cursor blink */
+        .cursor {
+            display: inline-block;
+            width: 7px;
+            height: 14px;
+            background: #c9d1d9;
+            animation: cursorBlink 1s step-end infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+
+        @keyframes cursorBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
 
         /* Scrollbar */
-        ::-webkit-scrollbar { width: 3px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(0,255,65,0.2); border-radius: 2px; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0d1117; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 
-        /* Scanline effect */
-        .console-body::after {
-            content: '';
+        /* Status bar */
+        .status-bar {
             position: fixed;
-            top: 40px; left: 0; right: 0; bottom: 0;
-            background: repeating-linear-gradient(
-                to bottom,
-                transparent 0px,
-                transparent 2px,
-                rgba(0,0,0,0.03) 2px,
-                rgba(0,0,0,0.03) 4px
-            );
-            pointer-events: none;
-            z-index: 5;
+            bottom: 0; left: 0; right: 0;
+            height: 22px;
+            background: #161b22;
+            border-top: 1px solid #30363d;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            gap: 16px;
+            font-size: 10px;
+            color: #484f58;
+            z-index: 10;
         }
+
+        .status-item { display: flex; align-items: center; gap: 4px; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+        .status-dot.live { background: #3fb950; box-shadow: 0 0 4px #3fb950; }
+        .status-dot.warn { background: #d29922; }
     </style>
 </head>
 <body>
-    <canvas id="matrix-canvas"></canvas>
-
-    <div class="console-header">
-        <div class="console-title">
-            <div class="dots">
-                <div class="dot dot-red"></div>
-                <div class="dot dot-yellow"></div>
-                <div class="dot dot-green"></div>
-            </div>
-            <span>wifi-csi-detector — Live Console</span>
-        </div>
-        <div class="console-stats">
-            <span class="stat-live">● LIVE</span>
-            <span id="console-fps">FPS: 0</span>
-            <span id="console-frames">Frames: 0</span>
-            <span id="console-uptime">Uptime: 0:00</span>
-        </div>
+    <div class="terminal-chrome">
+        <div class="chrome-dot r"></div>
+        <div class="chrome-dot y"></div>
+        <div class="chrome-dot g"></div>
+        <span class="chrome-title">pi@raspberrypi: ~/wifi-csi-detector</span>
     </div>
 
-    <div class="console-body">
-        <!-- Panel 1: Raw CSI Data Stream -->
-        <div class="console-panel">
-            <div class="panel-header">
-                <span class="panel-title">📡 CSI Data Stream</span>
-                <span class="panel-badge" id="stream-badge">RECEIVING</span>
-            </div>
-            <div class="panel-content">
-                <div class="data-stream" id="data-stream"></div>
-            </div>
-        </div>
+    <div class="terminal" id="terminal"></div>
 
-        <!-- Panel 2: Processing Pipeline -->
-        <div class="console-panel">
-            <div class="panel-header">
-                <span class="panel-title">⚙️ Processing Pipeline</span>
-                <span class="panel-badge" id="pipeline-badge">ACTIVE</span>
-            </div>
-            <div class="panel-content">
-                <div class="data-stream" id="pipeline-stream"></div>
-            </div>
-        </div>
-
-        <!-- Panel 3: Detection Output -->
-        <div class="console-panel">
-            <div class="panel-header">
-                <span class="panel-title">🎯 Detection Engine</span>
-                <span class="panel-badge" id="detection-console-badge">MONITORING</span>
-            </div>
-            <div class="panel-content">
-                <div class="detection-display" id="detection-display"></div>
-            </div>
-        </div>
-
-        <!-- Panel 4: Network / DB Log -->
-        <div class="console-panel">
-            <div class="panel-header">
-                <span class="panel-title">🌐 Network & Database</span>
-                <span class="panel-badge" id="net-badge">CONNECTED</span>
-            </div>
-            <div class="panel-content">
-                <div class="data-stream" id="net-stream"></div>
-            </div>
-        </div>
+    <div class="status-bar">
+        <div class="status-item"><div class="status-dot live"></div> LIVE</div>
+        <div class="status-item" id="sb-frames">frames: 0</div>
+        <div class="status-item" id="sb-fps">10 fps</div>
+        <div class="status-item" id="sb-variance">σ²: 0.00</div>
+        <div class="status-item" id="sb-status">idle</div>
+        <div class="status-item" style="margin-left:auto" id="sb-uptime">0:00</div>
     </div>
 
     <script>
-    // ═══ Matrix Rain (cinematic) ═══
-    (function initMatrix() {
-        const canvas = document.getElementById('matrix-canvas');
-        const ctx = canvas.getContext('2d');
-        const dpr = window.devicePixelRatio || 1;
+    const term = document.getElementById('terminal');
+    let lineCount = 0;
 
-        function resize() {
-            canvas.width = window.innerWidth * dpr;
-            canvas.height = window.innerHeight * dpr;
-            ctx.scale(dpr, dpr);
-        }
-        resize();
-        window.addEventListener('resize', resize);
+    function addLine(html, cls = '') {
+        const div = document.createElement('div');
+        div.className = 'line new';
+        if (cls) div.className += ' ' + cls;
+        div.innerHTML = html;
+        term.appendChild(div);
+        lineCount++;
+        if (lineCount > 500) term.removeChild(term.firstChild);
+        term.scrollTop = term.scrollHeight;
+    }
 
-        const charSets = [
-            'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン',
-            '01001101CSI_FRAME_DATA{}[]',
-            '∑∏∫∂√∞≈≠≤≥±×÷αβγδεζηθ',
-            '⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏',
-            'PRESENCE:TRUE|FALSE|σ²=',
-        ];
-        const allChars = charSets.join('');
+    function addLines(arr) { arr.forEach(l => addLine(l)); }
 
-        const fontSize = 14;
-        const colWidth = fontSize * 0.75;
-        const W = window.innerWidth;
-        const H = window.innerHeight;
-        const numCols = Math.ceil(W / colWidth);
+    function ts() {
+        return new Date().toLocaleTimeString('en-GB', { hour12: false });
+    }
 
-        // Each column has independent state
-        class Stream {
-            constructor(x) {
-                this.x = x;
-                this.reset();
-            }
-            reset() {
-                this.y = -Math.random() * 800 - 50; // Start above screen at random offset
-                this.speed = 1.5 + Math.random() * 4.5; // Variable falling speed
-                this.length = 8 + Math.floor(Math.random() * 30); // Trail length
-                this.chars = [];
-                this.charSet = charSets[Math.floor(Math.random() * charSets.length)];
-                this.mutateRate = 0.02 + Math.random() * 0.06; // How often chars change
-                this.brightness = 0.6 + Math.random() * 0.4;
-                this.active = Math.random() > 0.15; // Some columns start inactive
+    function prompt() {
+        return `<span class="prompt">pi@raspberrypi</span><span class="dim">:</span><span class="path">~/wifi-csi-detector</span><span class="dim">$</span> `;
+    }
 
-                // Pre-fill characters
-                for (let i = 0; i < this.length; i++) {
-                    this.chars.push(this.charSet[Math.floor(Math.random() * this.charSet.length)]);
-                }
-            }
-            update() {
-                if (!this.active) {
-                    if (Math.random() < 0.003) this.active = true;
-                    return;
-                }
+    // ═══ Boot Sequence ═══
+    async function bootSequence() {
+        addLine(prompt() + `<span class="cmd">sudo</span> <span class="flag">systemctl</span> start wifi-csi-detector.service`);
+        await delay(400);
+        addLine(`<span class="dim">● wifi-csi-detector.service - WiFi CSI Presence Detector</span>`);
+        addLine(`<span class="dim">     Loaded: loaded (/etc/systemd/system/wifi-csi-detector.service; enabled)</span>`);
+        addLine(`<span class="dim">     Active: </span><span class="ok">active (running)</span><span class="dim"> since ${new Date().toUTCString()}</span>`);
+        addLine(`<span class="dim">   Main PID: ${1200 + Math.floor(Math.random()*800)} (python3)</span>`);
+        addLine('');
+        await delay(300);
 
-                this.y += this.speed;
+        addLine(prompt() + `<span class="cmd">python3</span> <span class="str">server.py</span> <span class="flag">--port</span> <span class="num">8765</span> <span class="flag">--serial</span> <span class="str">/dev/ttyUSB0</span> <span class="flag">--baud</span> <span class="num">921600</span>`);
+        await delay(600);
 
-                // Mutate random characters in the trail
-                for (let i = 0; i < this.chars.length; i++) {
-                    if (Math.random() < this.mutateRate) {
-                        // Sometimes switch char set for variety
-                        const set = Math.random() < 0.1 ? allChars : this.charSet;
-                        this.chars[i] = set[Math.floor(Math.random() * set.length)];
-                    }
-                }
+        addLines([
+            `<span class="dim">[${ts()}]</span> <span class="blue">INFO</span>  Loading configuration from <span class="str">config.yaml</span>`,
+            `<span class="dim">[${ts()}]</span> <span class="blue">INFO</span>  Serial port: <span class="str">/dev/ttyUSB0</span> @ <span class="num">921600</span> baud`,
+            `<span class="dim">[${ts()}]</span> <span class="blue">INFO</span>  Detection threshold: <span class="num">12.0</span> | Sensitivity: <span class="num">0.70</span>`,
+            `<span class="dim">[${ts()}]</span> <span class="blue">INFO</span>  Window size: <span class="num">50</span> frames | Subcarriers: <span class="num">64</span>`,
+        ]);
+        await delay(200);
 
-                // Reset when fully off screen
-                if (this.y - this.length * fontSize > H) {
-                    this.reset();
-                    this.y = -Math.random() * 200;
-                    this.active = Math.random() > 0.1;
-                }
-            }
-            draw(ctx) {
-                if (!this.active) return;
+        addLines([
+            `<span class="dim">[${ts()}]</span> <span class="blue">INFO</span>  Opening serial connection...`,
+            `<span class="dim">[${ts()}]</span> <span class="ok">OK</span>    Serial connected to ESP32 (chip: ESP32-D0WD-V3)`,
+            `<span class="dim">[${ts()}]</span> <span class="blue">INFO</span>  Firmware: esp-csi v1.0.4 | MAC: <span class="num">3C:61:05:${Math.floor(Math.random()*0xFF).toString(16).padStart(2,'0')}:${Math.floor(Math.random()*0xFF).toString(16).padStart(2,'0')}:${Math.floor(Math.random()*0xFF).toString(16).padStart(2,'0')}</span>`,
+        ]);
+        await delay(300);
 
-                for (let i = 0; i < this.length; i++) {
-                    const charY = this.y - i * fontSize;
-                    if (charY < -fontSize || charY > H + fontSize) continue;
+        addLines([
+            `<span class="dim">[${ts()}]</span> <span class="blue">INFO</span>  Starting WebSocket server on <span class="str">ws://0.0.0.0:8765</span>`,
+            `<span class="dim">[${ts()}]</span> <span class="ok">OK</span>    WebSocket server ready — waiting for clients`,
+            `<span class="dim">[${ts()}]</span> <span class="blue">INFO</span>  Starting CSI data collection...`,
+        ]);
+        await delay(400);
 
-                    const progress = i / this.length; // 0=head, 1=tail
+        addLine('');
+        addLine(`<span class="separator">${'─'.repeat(72)}</span>`);
+        addLine(`<span class="dim">[${ts()}]</span> <span class="ok">▶ LIVE</span>  CSI stream active — processing frames`);
+        addLine(`<span class="separator">${'─'.repeat(72)}</span>`);
+        addLine('');
+        await delay(200);
 
-                    if (i === 0) {
-                        // Head: bright white/green glow
-                        ctx.fillStyle = `rgba(180, 255, 200, ${this.brightness})`;
-                        ctx.shadowColor = '#00ff41';
-                        ctx.shadowBlur = 12;
-                    } else if (i === 1) {
-                        // Just behind head: still bright
-                        ctx.fillStyle = `rgba(0, 255, 65, ${this.brightness * 0.9})`;
-                        ctx.shadowBlur = 6;
-                    } else {
-                        // Trail: fading green
-                        const alpha = (1 - progress) * this.brightness * 0.7;
-                        const g = Math.floor(200 + (1 - progress) * 55);
-                        ctx.fillStyle = `rgba(0, ${g}, 40, ${Math.max(0, alpha)})`;
-                        ctx.shadowBlur = 0;
-                    }
+        startDataStream();
+    }
 
-                    ctx.font = `${fontSize}px JetBrains Mono`;
-                    ctx.fillText(this.chars[i] || '0', this.x, charY);
-                }
-                ctx.shadowBlur = 0;
-            }
-        }
-
-        // Create streams with slight horizontal jitter
-        const streams = [];
-        for (let i = 0; i < numCols; i++) {
-            const x = i * colWidth + (Math.random() - 0.5) * 3;
-            streams.push(new Stream(x));
-            // Some columns get a second, delayed stream for density
-            if (Math.random() < 0.3) {
-                const s2 = new Stream(x);
-                s2.y -= 400 + Math.random() * 400;
-                s2.brightness *= 0.5;
-                streams.push(s2);
-            }
-        }
-
-        function animate() {
-            // Fade previous frame (creates the trail effect)
-            ctx.fillStyle = 'rgba(10, 14, 20, 0.07)';
-            ctx.fillRect(0, 0, W, H);
-
-            streams.forEach(s => {
-                s.update();
-                s.draw(ctx);
-            });
-
-            requestAnimationFrame(animate);
-        }
-        requestAnimationFrame(animate);
-    })();
-
-    // ═══ Simulator (same as dashboard) ═══
-    class MiniSimulator {
+    // ═══ Simulator ═══
+    class Sim {
         constructor() {
-            this.n = 64; this.t = 0; this.state = 'empty'; this.stateT = 0;
+            this.n = 64; this.t = 0; this.state = 'empty'; this.si = 0;
             this.states = ['empty','entering','moving','still','breathing','leaving'];
-            this.si = 0; this.dur = 6000 + Math.random()*6000;
-            this.base = Array.from({length:64}, (_,i) => 20 + 8*Math.exp(-2*((i/64*2-1)**2)) + (Math.random()-0.5)*3);
+            this.stateT = Date.now(); this.dur = 6000 + Math.random()*6000;
+            this.base = Array.from({length:64}, (_,i) => 20+8*Math.exp(-2*((i/64*2-1)**2))+(Math.random()-0.5)*3);
             this.history = []; this.variance = 0; this.detCount = 0; this.frames = 0;
-            this.start = Date.now(); this.lastPresence = false;
+            this.start = Date.now(); this.lastP = false;
         }
-        _g() { return Math.sqrt(-2*Math.log(Math.random()))*Math.cos(2*Math.PI*Math.random()); }
+        g() { return Math.sqrt(-2*Math.log(Math.random()))*Math.cos(2*Math.PI*Math.random()); }
         tick() {
             this.t++; this.frames++;
             if (Date.now()-this.stateT > this.dur) {
@@ -489,209 +245,133 @@
             }
             const p = Math.min(1,(Date.now()-this.stateT)/this.dur);
             const amps = this.base.map((b,i) => {
-                let pert = 0; const c=32, d=(i-c)/10;
-                if (this.state==='entering') pert = 6*p*Math.exp(-0.5*d*d);
-                else if (this.state==='moving') pert = 6*(0.8+0.2*Math.sin(this.t*0.3))*Math.exp(-0.5*((i-c+(Math.random()-0.5)*10)/10)**2)+this._g()*3;
-                else if (this.state==='still') pert = 3*Math.exp(-0.5*d*d)+this._g()*0.8;
-                else if (this.state==='breathing') pert = 2.5*Math.exp(-0.5*d*d)+2.5*Math.sin(this.t*0.2)*Math.exp(-0.5*(d/1.5)**2);
-                else if (this.state==='leaving') pert = 3*(1-p)*Math.exp(-0.5*d*d);
-                return Math.max(1,Math.min(50,b+this._g()*1.2+pert));
+                let pt = 0; const c=32, d=(i-c)/10;
+                if (this.state==='entering') pt = 6*p*Math.exp(-0.5*d*d);
+                else if (this.state==='moving') pt = 6*(0.8+0.2*Math.sin(this.t*0.3))*Math.exp(-0.5*((i-c+(Math.random()-0.5)*10)/10)**2)+this.g()*3;
+                else if (this.state==='still') pt = 3*Math.exp(-0.5*d*d)+this.g()*0.8;
+                else if (this.state==='breathing') pt = 2.5*Math.exp(-0.5*d*d)+2.5*Math.sin(this.t*0.2)*Math.exp(-0.5*(d/1.5)**2);
+                else if (this.state==='leaving') pt = 3*(1-p)*Math.exp(-0.5*d*d);
+                return Math.max(1,Math.min(50,b+this.g()*1.2+pt));
             });
             this.history.push(amps); if (this.history.length>50) this.history.shift();
             if (this.history.length>3) {
                 let v=0;
-                for (let s=0;s<64;s++) { let sm=0,sq=0; this.history.forEach(r=>{sm+=r[s];sq+=r[s]*r[s];}); const n=this.history.length; v+=sq/n-(sm/n)**2; }
+                for(let s=0;s<64;s++){let sm=0,sq=0;this.history.forEach(r=>{sm+=r[s];sq+=r[s]*r[s]});const n=this.history.length;v+=sq/n-(sm/n)**2;}
                 this.variance = 0.3*(v/64)+0.7*this.variance;
             }
             const presence = this.variance > 9.6;
             const movement = this.variance > 20;
-            if (presence && !this.lastPresence) this.detCount++;
-            this.lastPresence = presence;
+            if (presence && !this.lastP) this.detCount++;
+            this.lastP = presence;
             return { amps, variance: this.variance, presence, movement, state: this.state,
-                rssi: -55+(presence?-5:0)+this._g()*2, frames: this.frames, detections: this.detCount,
-                uptime: (Date.now()-this.start)/1000 };
+                rssi: Math.round(-55+(presence?-5:0)+this.g()*2), frames: this.frames, detections: this.detCount,
+                uptime: (Date.now()-this.start)/1000, avgAmp: amps.reduce((a,b)=>a+b,0)/64 };
         }
     }
 
-    const sim = new MiniSimulator();
-    let frameCount = 0, fpsCount = 0, currentFps = 0;
+    const sim = new Sim();
+    let fpsCount = 0, fps = 0;
+    setInterval(() => { fps = fpsCount; fpsCount = 0; }, 1000);
 
-    // ═══ FPS ═══
-    setInterval(() => { currentFps = fpsCount; fpsCount = 0; }, 1000);
+    // ═══ Data Stream ═══
+    let lastPresenceState = false;
+    let lastMovementState = false;
 
-    // ═══ Data Stream Panel ═══
-    function addDataLine(data) {
-        const el = document.getElementById('data-stream');
-        const ts = new Date().toLocaleTimeString('es-AR',{hour12:false});
-        const ampStr = data.amps.slice(0,8).map(a=>a.toFixed(1)).join(', ');
-
-        const lines = [
-            `<span class="tag-time">[${ts}]</span> <span class="tag-type">CSI_DATA</span> <span class="tag-bracket">{</span>`,
-            `  <span class="tag-key">"rssi"</span>: <span class="tag-num">${data.rssi.toFixed(0)}</span>, <span class="tag-key">"channel"</span>: <span class="tag-num">6</span>, <span class="tag-key">"bw"</span>: <span class="tag-num">20</span>,`,
-            `  <span class="tag-key">"amplitudes"</span>: <span class="tag-bracket">[</span><span class="tag-num">${ampStr}</span>, ...<span class="tag-bracket">]</span> <span class="tag-comment">// ${data.amps.length} subcarriers</span>`,
-            `  <span class="tag-key">"variance"</span>: <span class="tag-num">${data.variance.toFixed(3)}</span>, <span class="tag-key">"frame"</span>: <span class="tag-num">${data.frames}</span>`,
-            `<span class="tag-bracket">}</span>`,
-        ];
-
-        lines.forEach(l => {
-            const div = document.createElement('div');
-            div.className = 'data-line';
-            div.innerHTML = l;
-            el.appendChild(div);
-        });
-
-        while (el.children.length > 80) el.removeChild(el.firstChild);
-        el.scrollTop = el.scrollHeight;
+    function startDataStream() {
+        setInterval(() => {
+            const d = sim.tick();
+            fpsCount++;
+            outputFrame(d);
+            updateStatusBar(d);
+        }, 100);
     }
 
-    // ═══ Pipeline Panel ═══
-    const pipelineSteps = [
-        { icon: '📥', text: 'Serial.read() → buffer[{n}]', key: 'read' },
-        { icon: '🔍', text: 'parse_csi_line() → {n} subcarriers extracted', key: 'parse' },
-        { icon: '📊', text: 'compute_amplitude(I, Q) → √(I²+Q²)', key: 'amp' },
-        { icon: '🧮', text: 'variance_filter(window={w}) → σ² = {v}', key: 'var' },
-        { icon: '🧠', text: 'detect_presence(σ² > θ) → {result}', key: 'detect' },
-        { icon: '💾', text: 'db.insert({{frame: {f}, presence: {p}, ts: {ts}}})', key: 'db' },
-        { icon: '📡', text: 'ws.broadcast(clients={c}) → {bytes}B sent', key: 'ws' },
-    ];
+    function outputFrame(d) {
+        const t = ts();
+        const ampPreview = d.amps.slice(0, 6).map(a => a.toFixed(1)).join(', ');
 
-    function addPipelineLine(data) {
-        const el = document.getElementById('pipeline-stream');
-        const ts = new Date().toLocaleTimeString('es-AR',{hour12:false});
-
-        pipelineSteps.forEach((step, i) => {
-            setTimeout(() => {
-                let text = step.text
-                    .replace('{n}', data.amps.length)
-                    .replace('{w}', '50')
-                    .replace('{v}', data.variance.toFixed(4))
-                    .replace('{result}', data.presence ? '<span class="tag-alert">TRUE</span>' : '<span class="tag-ok">false</span>')
-                    .replace('{f}', data.frames)
-                    .replace('{p}', data.presence)
-                    .replace('{ts}', ts)
-                    .replace('{c}', Math.floor(1+Math.random()*3))
-                    .replace('{bytes}', (1200+Math.floor(Math.random()*800)));
-
-                const div = document.createElement('div');
-                div.className = 'data-line';
-                div.innerHTML = `<span class="tag-time">[${ts}]</span> ${step.icon} <span class="tag-data">${text}</span>`;
-                el.appendChild(div);
-
-                while (el.children.length > 60) el.removeChild(el.firstChild);
-                el.scrollTop = el.scrollHeight;
-            }, i * 60);
-        });
-    }
-
-    // ═══ Detection Panel ═══
-    const asciiEmpty = `
-    ╔═══════════════════╗
-    ║                   ║
-    ║   ╭─── WiFi ───╮  ║
-    ║   │  ≋≋≋≋≋≋≋≋  │  ║
-    ║   │  ≋≋≋≋≋≋≋≋  │  ║
-    ║   │  ≋≋≋≋≋≋≋≋  │  ║
-    ║   ╰────────────╯  ║
-    ║    ÁREA LIMPIA     ║
-    ╚═══════════════════╝`;
-
-    const asciiPresence = `
-    ╔═══════════════════╗
-    ║                   ║
-    ║   ╭─── WiFi ───╮  ║
-    ║   │  ≋≋ ◉ ≋≋  │  ║
-    ║   │  ≋ /█\\ ≋  │  ║
-    ║   │  ≋ / \\ ≋  │  ║
-    ║   ╰────────────╯  ║
-    ║  ⚠ DETECTADO ⚠    ║
-    ╚═══════════════════╝`;
-
-    const asciiMovement = `
-    ╔═══════════════════╗
-    ║     ⚡ ⚡ ⚡       ║
-    ║   ╭─── WiFi ───╮  ║
-    ║   │ ≋≋ ◉  ≋≋  │  ║
-    ║   │ ≋ /█\\→ ≋  │  ║
-    ║   │ ≋ / \\ ≋≋  │  ║
-    ║   ╰────────────╯  ║
-    ║  🔴 MOVIMIENTO 🔴  ║
-    ╚═══════════════════╝`;
-
-    function updateDetectionPanel(data) {
-        const el = document.getElementById('detection-display');
-        const badge = document.getElementById('detection-console-badge');
-
-        let ascii, statusColor, statusText;
-        if (data.movement) {
-            ascii = asciiMovement; statusColor = '#ffab00'; statusText = '⚡ MOVIMIENTO ACTIVO';
-            badge.textContent = '⚠ ALERT'; badge.style.background = 'rgba(255,23,68,0.2)'; badge.style.color = '#ff1744';
-        } else if (data.presence) {
-            ascii = asciiPresence; statusColor = '#ff1744'; statusText = '● PRESENCIA DETECTADA';
-            badge.textContent = 'DETECTED'; badge.style.background = 'rgba(255,23,68,0.15)'; badge.style.color = '#ff1744';
-        } else {
-            ascii = asciiEmpty; statusColor = '#00ff41'; statusText = '○ SIN PRESENCIA';
-            badge.textContent = 'CLEAR'; badge.style.background = 'rgba(0,255,65,0.1)'; badge.style.color = '#00ff41';
+        // Raw CSI line (like real ESP32 serial output)
+        if (d.frames % 5 === 0) {
+            const rawLine = `CSI_DATA,${d.frames},${Date.now()},${d.rssi},-95,6,0,1,${d.amps.length},0,0,[${d.amps.map(a=>Math.round(a)).join(',')}]`;
+            addLine(`<span class="dim">${rawLine.substring(0, 120)}...</span>`);
         }
 
-        el.innerHTML = `
-            <pre class="detection-ascii" style="color:${statusColor}">${ascii}</pre>
-            <div class="detection-status" style="color:${statusColor}">${statusText}</div>
-            <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100,data.variance*3)}%;background:${statusColor}"></div></div>
-            <div class="detection-metrics">
-                <span class="label">Varianza:</span><span class="val" style="color:${statusColor}">${data.variance.toFixed(2)}</span>
-                <span class="label">RSSI:</span><span class="val">${data.rssi.toFixed(0)} dBm</span>
-                <span class="label">Detecciones:</span><span class="val">${data.detections}</span>
-                <span class="label">Estado:</span><span class="val">${data.state}</span>
-            </div>
-        `;
-    }
+        // Processing output
+        const vColor = d.variance > 20 ? 'err' : d.variance > 9.6 ? 'warn' : 'ok';
+        addLine(
+            `<span class="time">[${t}]</span> ` +
+            `<span class="dim">frame</span> <span class="num">${String(d.frames).padStart(5)}</span> ` +
+            `<span class="dim">│</span> rssi <span class="num">${String(d.rssi).padStart(3)}</span> ` +
+            `<span class="dim">│</span> σ² <span class="${vColor}">${d.variance.toFixed(2).padStart(6)}</span> ` +
+            `<span class="dim">│</span> avg <span class="num">${d.avgAmp.toFixed(1).padStart(5)}</span> ` +
+            `<span class="dim">│</span> <span class="${vColor}">${d.movement ? 'MOVEMENT' : d.presence ? 'PRESENCE' : '--------'}</span>`
+        );
 
-    // ═══ Network Panel ═══
-    const netActions = [
-        (d) => `<span class="net-arrow">→</span> <span class="tag-type">POST</span> <span class="net-url">/api/v1/csi/frames</span> <span class="net-status-ok">201</span> <span class="net-bytes">${1200+Math.floor(Math.random()*600)}B ${(2+Math.random()*5).toFixed(0)}ms</span>`,
-        (d) => `<span class="net-arrow">→</span> <span class="tag-type">WS</span> <span class="net-url">ws://sensor.local:8765</span> <span class="net-status-ok">SEND</span> <span class="net-bytes">frame #${d.frames}</span>`,
-        (d) => `<span class="net-arrow">←</span> <span class="tag-type">ACK</span> <span class="net-url">client_${Math.floor(Math.random()*3+1)}</span> <span class="net-status-ok">OK</span> <span class="net-bytes">${(1+Math.random()*2).toFixed(0)}ms</span>`,
-        (d) => `<span class="net-arrow">→</span> <span class="tag-type">INSERT</span> <span class="net-url">mongodb://db/csi_readings</span> <span class="net-status-ok">OK</span> <span class="net-bytes">doc_${Date.now().toString(36)}</span>`,
-        (d) => `<span class="net-arrow">→</span> <span class="tag-type">PUSH</span> <span class="net-url">redis://cache/latest_frame</span> <span class="net-status-ok">SET</span> <span class="net-bytes">TTL=30s</span>`,
-        (d) => d.presence ? `<span class="net-arrow">→</span> <span class="tag-type">ALERT</span> <span class="net-url">webhook/presence</span> <span class="tag-alert">TRIGGER</span> <span class="net-bytes">σ²=${d.variance.toFixed(1)}</span>` : `<span class="net-arrow">•</span> <span class="tag-type">HEARTBEAT</span> <span class="net-url">health/check</span> <span class="net-status-ok">200</span> <span class="net-bytes">all systems nominal</span>`,
-    ];
-
-    function addNetLine(data) {
-        const el = document.getElementById('net-stream');
-        const ts = new Date().toLocaleTimeString('es-AR',{hour12:false});
-
-        const numLines = 2 + Math.floor(Math.random() * 2);
-        for (let i = 0; i < numLines; i++) {
-            const action = netActions[Math.floor(Math.random()*netActions.length)];
-            const div = document.createElement('div');
-            div.className = 'data-line net-line';
-            div.innerHTML = `<span class="tag-time">[${ts}]</span> ${action(data)}`;
-            el.appendChild(div);
+        // Detection state changes
+        if (d.presence && !lastPresenceState) {
+            addLine('');
+            addLine(`<span class="time">[${t}]</span> <span class="err bold">▲ PRESENCE DETECTED</span>  <span class="dim">variance=${d.variance.toFixed(2)} threshold=9.60 confidence=${(Math.min(d.variance/9.6, 3)*33).toFixed(0)}%</span>`);
+            addLine(`<span class="time">[${t}]</span> <span class="dim">  trigger: subcarrier amplitude deviation exceeds baseline by ${(d.variance - 9.6).toFixed(1)}σ</span>`);
+            addLine('');
+        }
+        if (!d.presence && lastPresenceState) {
+            addLine('');
+            addLine(`<span class="time">[${t}]</span> <span class="ok bold">▼ PRESENCE CLEARED</span>   <span class="dim">variance=${d.variance.toFixed(2)} — returning to baseline</span>`);
+            addLine('');
+        }
+        if (d.movement && !lastMovementState) {
+            addLine(`<span class="time">[${t}]</span> <span class="warn bold">⚡ ACTIVE MOVEMENT</span>  <span class="dim">variance=${d.variance.toFixed(2)} exceeds movement threshold (20.0)</span>`);
         }
 
-        while (el.children.length > 60) el.removeChild(el.firstChild);
-        el.scrollTop = el.scrollHeight;
+        lastPresenceState = d.presence;
+        lastMovementState = d.movement;
+
+        // Periodic stats
+        if (d.frames % 50 === 0) {
+            addLine('');
+            addLine(`<span class="separator">${'─'.repeat(72)}</span>`);
+            const upM = Math.floor(d.uptime/60), upS = Math.floor(d.uptime%60);
+            addLine(
+                `<span class="time">[${t}]</span> <span class="blue">STATS</span> ` +
+                `uptime=<span class="num">${upM}:${String(upS).padStart(2,'0')}</span> ` +
+                `frames=<span class="num">${d.frames}</span> ` +
+                `detections=<span class="num">${d.detections}</span> ` +
+                `fps=<span class="num">${fps}</span> ` +
+                `mem=<span class="num">${(32 + d.frames * 0.02).toFixed(1)}MB</span>`
+            );
+            addLine(`<span class="separator">${'─'.repeat(72)}</span>`);
+            addLine('');
+        }
+
+        // Occasional system messages
+        if (d.frames % 100 === 0 && d.frames > 0) {
+            const msgs = [
+                `<span class="time">[${t}]</span> <span class="blue">INFO</span>  Baseline recalibrated — noise_floor=<span class="num">-95.${Math.floor(Math.random()*9)}</span> dBm`,
+                `<span class="time">[${t}]</span> <span class="blue">INFO</span>  WebSocket client connected from <span class="num">192.168.1.${Math.floor(Math.random()*50+100)}</span>`,
+                `<span class="time">[${t}]</span> <span class="blue">INFO</span>  Buffer flush — wrote <span class="num">${d.frames}</span> frames to <span class="str">data/csi_log_${new Date().toISOString().slice(0,10)}.csv</span>`,
+                `<span class="time">[${t}]</span> <span class="dim">DEBUG</span> Serial RX: <span class="num">${(900+Math.floor(Math.random()*100))}</span> bytes/s | dropped: <span class="num">0</span>`,
+            ];
+            addLine(msgs[Math.floor(Math.random() * msgs.length)]);
+        }
     }
 
-    // ═══ Main Loop ═══
-    function update() {
-        const data = sim.tick();
-        frameCount++;
-        fpsCount++;
-
-        addDataLine(data);
-        if (frameCount % 3 === 0) addPipelineLine(data);
-        updateDetectionPanel(data);
-        if (frameCount % 2 === 0) addNetLine(data);
-
-        // Header stats
-        document.getElementById('console-fps').textContent = `FPS: ${currentFps}`;
-        document.getElementById('console-frames').textContent = `Frames: ${data.frames}`;
-        const m = Math.floor(data.uptime/60), s = Math.floor(data.uptime%60);
-        document.getElementById('console-uptime').textContent = `Uptime: ${m}:${s.toString().padStart(2,'0')}`;
+    function updateStatusBar(d) {
+        document.getElementById('sb-frames').textContent = `frames: ${d.frames}`;
+        document.getElementById('sb-fps').textContent = `${fps} fps`;
+        document.getElementById('sb-variance').textContent = `σ²: ${d.variance.toFixed(2)}`;
+        document.getElementById('sb-status').innerHTML = d.movement
+            ? '<span style="color:#d29922">MOVEMENT</span>'
+            : d.presence
+            ? '<span style="color:#f85149">PRESENCE</span>'
+            : '<span style="color:#3fb950">clear</span>';
+        const m = Math.floor(d.uptime/60), s = Math.floor(d.uptime%60);
+        document.getElementById('sb-uptime').textContent = `${m}:${String(s).padStart(2,'0')}`;
     }
 
-    setInterval(update, 100);
+    function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // Start
+    bootSequence();
     </script>
 </body>
 </html>
