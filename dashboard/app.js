@@ -227,16 +227,9 @@ function handlePortList(data) {
 function updateConnectionStatus(status, text) {
     const dot = document.getElementById('status-dot');
     const label = document.getElementById('status-text');
-    const logo = document.getElementById('logo-pulse');
 
-    dot.className = `status-dot ${status}`;
-    label.textContent = text;
-
-    if (status === 'connected') {
-        logo.classList.add('pulse');
-    } else {
-        logo.classList.remove('pulse');
-    }
+    if (dot) dot.className = `status-dot ${status}`;
+    if (label) label.textContent = text;
 }
 
 function updatePresenceUI(data) {
@@ -620,11 +613,7 @@ function initRoomView() {
 
 function drawRoomView(data, targetCanvas) {
     const canvas = targetCanvas || document.getElementById('room-canvas');
-    if (!targetCanvas) {
-        const rect = canvas.parentElement.getBoundingClientRect();
-        canvas.width = rect.width - 40;
-        canvas.height = 280;
-    }
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const W = canvas.width;
     const H = canvas.height;
@@ -786,12 +775,9 @@ function drawESP32(ctx, x, y, label, color) {
 
     // LED indicator
     ctx.fillStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.arc(x, y, 3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
 
     // Label
     ctx.fillStyle = color;
@@ -898,10 +884,7 @@ function initRadar() {
 
 function drawRadar(data, targetCanvas) {
     const canvas = targetCanvas || document.getElementById('radar-canvas');
-    if (!targetCanvas) {
-        canvas.width = 280;
-        canvas.height = 280;
-    }
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const W = canvas.width;
     const H = canvas.height;
