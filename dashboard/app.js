@@ -33,6 +33,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Show/hide mode toggle (only on detection page)
             const modeToggle = document.getElementById('mode-toggle');
             if (modeToggle) modeToggle.style.display = page === 'detection' ? '' : 'none';
+            // Lazy-load terminal iframe
+            if (page === 'terminal') {
+                const iframe = document.getElementById('terminal-iframe');
+                if (iframe && !iframe.src) {
+                    iframe.src = iframe.dataset.src;
+                }
+            }
         });
     });
 });
@@ -1234,14 +1241,9 @@ function addEvent(type, text) {
 // ═══════════════════════════════════════════════════════════
 
 function initSettings() {
-    // Toggle settings panel
-    document.getElementById('btn-settings').addEventListener('click', () => {
-        document.getElementById('settings-panel').classList.add('open');
-        document.getElementById('settings-overlay').classList.add('active');
-    });
-
-    document.getElementById('btn-close-settings').addEventListener('click', closeSettings);
-    document.getElementById('settings-overlay').addEventListener('click', closeSettings);
+    // Settings overlay (legacy, safe guard)
+    const overlay = document.getElementById('settings-overlay');
+    if (overlay) overlay.addEventListener('click', () => overlay.classList.remove('active'));
 
     // Mode buttons
     document.getElementById('btn-demo').addEventListener('click', () => {
@@ -1309,10 +1311,7 @@ function initSettings() {
     });
 }
 
-function closeSettings() {
-    document.getElementById('settings-panel').classList.remove('open');
-    document.getElementById('settings-overlay').classList.remove('active');
-}
+
 
 function setupSlider(inputId, displayId, formatter) {
     const input = document.getElementById(inputId);

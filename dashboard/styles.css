@@ -533,8 +533,8 @@ body::before {
 /* ─── Main Layout ────────────────────────────────────────── */
 #app-main {
     padding: 20px 24px;
-    max-width: 1600px;
-    margin: 0 auto;
+    max-width: none;
+    margin-left: 220px;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -1251,7 +1251,10 @@ body::before {
     }
 }
 
-@media (max-width: 800px) {
+    @media (max-width: 800px) {
+    .sidebar { display: none; }
+    #app-header { margin-left: 0; }
+    #app-main { margin-left: 0; padding: 12px; }
     #app-header {
         padding: 0 16px;
         flex-wrap: wrap;
@@ -1265,14 +1268,6 @@ body::before {
         order: 3;
         width: 100%;
         justify-content: center;
-    }
-
-    .logo h1 {
-        font-size: 1rem;
-    }
-
-    #app-main {
-        padding: 12px 12px;
     }
 
     .top-row {
@@ -1295,11 +1290,6 @@ body::before {
         height: 200px;
     }
 
-    .settings-panel {
-        width: 100%;
-        right: -100%;
-    }
-
     #room-canvas {
         height: 220px;
     }
@@ -1308,6 +1298,9 @@ body::before {
         width: 220px;
         height: 220px;
     }
+
+    .cameras-grid { grid-template-columns: 1fr; }
+    .sh-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
