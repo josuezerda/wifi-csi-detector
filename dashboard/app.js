@@ -568,8 +568,13 @@ function initRoomView() {
     });
 }
 
-function drawRoomView(data) {
-    const canvas = document.getElementById('room-canvas');
+function drawRoomView(data, targetCanvas) {
+    const canvas = targetCanvas || document.getElementById('room-canvas');
+    if (!targetCanvas) {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width - 40;
+        canvas.height = 280;
+    }
     const ctx = canvas.getContext('2d');
     const W = canvas.width;
     const H = canvas.height;
@@ -841,8 +846,12 @@ function initRadar() {
     canvas.height = 280;
 }
 
-function drawRadar(data) {
-    const canvas = document.getElementById('radar-canvas');
+function drawRadar(data, targetCanvas) {
+    const canvas = targetCanvas || document.getElementById('radar-canvas');
+    if (!targetCanvas) {
+        canvas.width = 280;
+        canvas.height = 280;
+    }
     const ctx = canvas.getContext('2d');
     const W = canvas.width;
     const H = canvas.height;
@@ -1023,10 +1032,37 @@ function startVisualLoop() {
             const data = state.lastFrame;
             drawRoomView(data);
             drawRadar(data);
+
+            // Also render to fullscreen canvas if active
+            if (fullscreenCanvas && fullscreenSourceId) {
+                if (fullscreenSourceId === 'room-canvas') {
+                    drawRoomView(data, fullscreenCanvas);
+                } else if (fullscreenSourceId === 'radar-canvas') {
+                    drawRadar(data, fullscreenCanvas);
+                } else if (fullscreenSourceId === 'heatmap-canvas') {
+                    drawHeatmapToCanvas(fullscreenCanvas);
+                } else if (fullscreenSourceId.includes('chart')) {
+                    const src = document.getElementById(fullscreenSourceId);
+                    if (src) {
+                        const fsCtx = fullscreenCanvas.getContext('2d');
+                        fsCtx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+                        fsCtx.drawImage(src, 0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+                    }
+                }
+            }
         }
         visualAnimFrame = requestAnimationFrame(loop);
     }
     visualAnimFrame = requestAnimationFrame(loop);
+}
+
+function drawHeatmapToCanvas(target) {
+    const source = document.getElementById('heatmap-canvas');
+    if (!source) return;
+    const ctx = target.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, target.width, target.height);
+    ctx.drawImage(source, 0, 0, target.width, target.height);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1253,12 +1289,11 @@ function setupSlider(inputId, displayId, formatter) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Fullscreen Expand
+// Fullscreen Expand (native resolution rendering)
 // ═══════════════════════════════════════════════════════════
 
-let fullscreenSource = null;
+let fullscreenSourceId = null;
 let fullscreenCanvas = null;
-let fullscreenAnimFrame = null;
 
 const expandTitles = {
     'room-canvas': '🏠 Vista de Habitación',
@@ -1284,82 +1319,57 @@ function initExpandButtons() {
 }
 
 function openFullscreen(canvasId) {
-    const source = document.getElementById(canvasId);
-    if (!source) return;
-
-    fullscreenSource = source;
     const modal = document.getElementById('fullscreen-modal');
     const body = document.getElementById('fullscreen-body');
     const title = document.getElementById('fullscreen-title');
 
     title.textContent = expandTitles[canvasId] || 'Visualización';
+    fullscreenSourceId = canvasId;
 
-    // Create a fullscreen canvas
     body.innerHTML = '';
     fullscreenCanvas = document.createElement('canvas');
     fullscreenCanvas.id = 'fullscreen-canvas';
 
-    const isChart = canvasId.includes('chart');
+    const dpr = window.devicePixelRatio || 1;
+    const availW = window.innerWidth * 0.92;
+    const availH = window.innerHeight * 0.85;
 
-    if (isChart) {
-        // For Chart.js: just make the card bigger
-        fullscreenCanvas.style.width = '95vw';
-        fullscreenCanvas.style.height = '85vh';
+    if (canvasId === 'radar-canvas') {
+        // Radar must be square
+        const size = Math.min(availW, availH);
+        fullscreenCanvas.width = Math.round(size * dpr);
+        fullscreenCanvas.height = Math.round(size * dpr);
+        fullscreenCanvas.style.width = size + 'px';
+        fullscreenCanvas.style.height = size + 'px';
+    } else if (canvasId === 'heatmap-canvas') {
+        // Heatmap: wide aspect
+        const w = availW;
+        const h = availH * 0.7;
+        fullscreenCanvas.width = Math.round(w * dpr);
+        fullscreenCanvas.height = Math.round(h * dpr);
+        fullscreenCanvas.style.width = w + 'px';
+        fullscreenCanvas.style.height = h + 'px';
     } else {
-        // For raw canvas: mirror at higher resolution
-        fullscreenCanvas.style.width = '90vw';
-        fullscreenCanvas.style.height = '85vh';
+        // Room view and charts: fill available space
+        fullscreenCanvas.width = Math.round(availW * dpr);
+        fullscreenCanvas.height = Math.round(availH * dpr);
+        fullscreenCanvas.style.width = availW + 'px';
+        fullscreenCanvas.style.height = availH + 'px';
     }
+
+    // Scale context for HiDPI
+    const ctx = fullscreenCanvas.getContext('2d');
+    ctx.scale(dpr, dpr);
 
     body.appendChild(fullscreenCanvas);
     modal.classList.add('active');
-
-    if (!isChart) {
-        // Start mirroring loop for raw canvases
-        function mirrorLoop() {
-            if (!fullscreenCanvas || !modal.classList.contains('active')) return;
-
-            const w = fullscreenCanvas.clientWidth;
-            const h = fullscreenCanvas.clientHeight;
-            fullscreenCanvas.width = w;
-            fullscreenCanvas.height = h;
-
-            const ctx = fullscreenCanvas.getContext('2d');
-            ctx.imageSmoothingEnabled = canvasId !== 'heatmap-canvas';
-            ctx.drawImage(source, 0, 0, w, h);
-
-            fullscreenAnimFrame = requestAnimationFrame(mirrorLoop);
-        }
-        fullscreenAnimFrame = requestAnimationFrame(mirrorLoop);
-    } else {
-        // For charts, create a new Chart.js instance in fullscreen
-        const sourceChart = state.charts[canvasId === 'amplitude-chart' ? 'amplitude' : 'variance'];
-        if (sourceChart) {
-            fullscreenCanvas.width = window.innerWidth * 0.9;
-            fullscreenCanvas.height = window.innerHeight * 0.8;
-            const fsCtx = fullscreenCanvas.getContext('2d');
-
-            function chartMirror() {
-                if (!fullscreenCanvas || !modal.classList.contains('active')) return;
-                fsCtx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
-                fsCtx.drawImage(source, 0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
-                fullscreenAnimFrame = requestAnimationFrame(chartMirror);
-            }
-            fullscreenAnimFrame = requestAnimationFrame(chartMirror);
-        }
-    }
 }
 
 function closeFullscreen() {
     const modal = document.getElementById('fullscreen-modal');
     modal.classList.remove('active');
-
-    if (fullscreenAnimFrame) {
-        cancelAnimationFrame(fullscreenAnimFrame);
-        fullscreenAnimFrame = null;
-    }
     fullscreenCanvas = null;
-    fullscreenSource = null;
+    fullscreenSourceId = null;
 }
 
 // ═══════════════════════════════════════════════════════════
