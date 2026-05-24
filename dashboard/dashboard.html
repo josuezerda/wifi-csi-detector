@@ -18,21 +18,54 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- ─── Header ─────────────────────────────────────── -->
-    <header id="app-header">
-        <div class="header-left">
-            <div class="logo">
-                <div class="logo-icon" id="logo-pulse">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                    </svg>
-                </div>
-                <div>
-                    <h1>Spectra</h1>
-                    <p class="subtitle">Sistema de Percepción Espacial</p>
+    <!-- ─── Sidebar Navigation ─── -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <span class="sidebar-logo">Spectra</span>
+            <span class="sidebar-version">v1.0</span>
+        </div>
+        <div class="sidebar-nav">
+            <button class="nav-item active" data-page="detection" id="nav-detection">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+                <span>Detección RF</span>
+            </button>
+            <button class="nav-item" data-page="cameras" id="nav-cameras">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <span>Cámaras</span>
+            </button>
+            <button class="nav-item" data-page="smarthome" id="nav-smarthome">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Control Home</span>
+            </button>
+            <button class="nav-item" data-page="terminal" id="nav-terminal">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                <span>Terminal</span>
+            </button>
+            <div class="nav-divider"></div>
+            <button class="nav-item" data-page="settings" id="nav-settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span>Configuración</span>
+            </button>
+        </div>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar">SA</div>
+                <div class="user-info">
+                    <span class="user-name">Super Admin</span>
+                    <span class="user-role">Administrador</span>
                 </div>
             </div>
+            <button class="nav-item logout-btn" onclick="sessionStorage.removeItem('spectra_auth');window.location.href='index.html'">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <span>Cerrar Sesión</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ─── Top Bar ─── -->
+    <header id="app-header">
+        <div class="header-left">
+            <h2 class="page-title" id="page-title">Detección RF</h2>
         </div>
         <div class="header-center">
             <div class="connection-status" id="connection-status">
@@ -49,26 +82,14 @@
                     <span class="mode-icon">📡</span> Live
                 </button>
             </div>
-            <a href="console.html" target="_blank" class="icon-btn console-link" title="Live Console">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
-                </svg>
-            </a>
-            <button class="icon-btn" id="btn-settings" title="Configuración">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-                </svg>
-            </button>
-            <button class="icon-btn" id="btn-logout" title="Cerrar Sesión" onclick="sessionStorage.removeItem('spectra_auth');window.location.href='index.html'" style="color:#f85149">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-            </button>
         </div>
     </header>
 
-    <!-- ─── Main Content ───────────────────────────────── -->
+    <!-- ─── Main Content ─── -->
     <main id="app-main">
+
+    <!-- ─── PAGE: Detection (default visible) ─── -->
+    <div class="page active" id="page-detection">
         <!-- ─── Top Row: Presence + Stats ──────────────── -->
         <section class="top-row">
             <!-- Indicador de Presencia Principal -->
@@ -245,18 +266,175 @@
                 </div>
             </div>
         </section>
-    </main>
+    </div>
+    <!-- END PAGE: Detection -->
 
-    <!-- ─── Settings Panel (Sidebar) ───────────────────── -->
-    <aside class="settings-panel" id="settings-panel">
-        <div class="settings-header">
-            <h3>⚙️ Configuración</h3>
-            <button class="icon-btn" id="btn-close-settings">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-        </div>
+    <!-- ─── PAGE: Cameras ─── -->
+    <div class="page" id="page-cameras">
+        <section class="cameras-section">
+            <div class="cameras-grid">
+                <div class="card camera-card">
+                    <div class="card-header">
+                        <h3>📷 Cámara 1 — Entrada Principal</h3>
+                        <span class="badge badge-live">● EN VIVO</span>
+                    </div>
+                    <div class="camera-feed">
+                        <div class="camera-placeholder">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            <p>Conectar cámara RTSP / USB</p>
+                            <span class="camera-url">rtsp://192.168.1.100:554/stream1</span>
+                        </div>
+                    </div>
+                    <div class="camera-info">
+                        <span>Estado: <strong style="color:var(--accent-amber)">Esperando conexión</strong></span>
+                        <span>Detección: Movimiento + RF</span>
+                    </div>
+                </div>
+                <div class="card camera-card">
+                    <div class="card-header">
+                        <h3>📷 Cámara 2 — Patio Trasero</h3>
+                        <span class="badge">OFFLINE</span>
+                    </div>
+                    <div class="camera-feed">
+                        <div class="camera-placeholder">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            <p>Conectar cámara RTSP / USB</p>
+                            <span class="camera-url">rtsp://192.168.1.101:554/stream1</span>
+                        </div>
+                    </div>
+                    <div class="camera-info">
+                        <span>Estado: <strong style="color:var(--text-muted)">Sin configurar</strong></span>
+                        <span>Detección: Movimiento</span>
+                    </div>
+                </div>
+                <div class="card camera-card">
+                    <div class="card-header">
+                        <h3>📷 Cámara 3 — Interior</h3>
+                        <span class="badge">OFFLINE</span>
+                    </div>
+                    <div class="camera-feed">
+                        <div class="camera-placeholder">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            <p>Conectar cámara RTSP / USB</p>
+                            <span class="camera-url">rtsp://192.168.1.102:554/stream1</span>
+                        </div>
+                    </div>
+                    <div class="camera-info">
+                        <span>Estado: <strong style="color:var(--text-muted)">Sin configurar</strong></span>
+                        <span>Detección: RF + Movimiento</span>
+                    </div>
+                </div>
+                <div class="card camera-card add-camera-card">
+                    <div class="add-camera">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        <p>Agregar Cámara</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+    <!-- END PAGE: Cameras -->
+
+    <!-- ─── PAGE: Smart Home ─── -->
+    <div class="page" id="page-smarthome">
+        <section class="smarthome-section">
+            <div class="sh-grid">
+                <!-- Zones -->
+                <div class="card sh-zones-card">
+                    <div class="card-header"><h3>🏠 Zonas del Hogar</h3></div>
+                    <div class="sh-zones">
+                        <div class="sh-zone">
+                            <div class="sh-zone-icon" style="background:var(--accent-green-dim);color:var(--accent-green)">LV</div>
+                            <div class="sh-zone-info">
+                                <strong>Living</strong>
+                                <span>2 sensores RF • 1 cámara</span>
+                            </div>
+                            <span class="sh-zone-status" style="color:var(--accent-green)">● Activo</span>
+                        </div>
+                        <div class="sh-zone">
+                            <div class="sh-zone-icon" style="background:var(--accent-cyan-dim);color:var(--accent-cyan)">DR</div>
+                            <div class="sh-zone-info">
+                                <strong>Dormitorio</strong>
+                                <span>2 sensores RF • 0 cámaras</span>
+                            </div>
+                            <span class="sh-zone-status" style="color:var(--accent-cyan)">● Activo</span>
+                        </div>
+                        <div class="sh-zone">
+                            <div class="sh-zone-icon" style="background:var(--accent-amber-dim);color:var(--accent-amber)">CO</div>
+                            <div class="sh-zone-info">
+                                <strong>Cocina</strong>
+                                <span>0 sensores RF • 1 cámara</span>
+                            </div>
+                            <span class="sh-zone-status" style="color:var(--accent-amber)">● Parcial</span>
+                        </div>
+                        <div class="sh-zone">
+                            <div class="sh-zone-icon" style="background:rgba(255,255,255,0.05);color:var(--text-muted)">PT</div>
+                            <div class="sh-zone-info">
+                                <strong>Patio</strong>
+                                <span>Sin configurar</span>
+                            </div>
+                            <span class="sh-zone-status" style="color:var(--text-muted)">○ Inactivo</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Quick controls -->
+                <div class="card sh-controls-card">
+                    <div class="card-header"><h3>⚡ Controles Rápidos</h3></div>
+                    <div class="sh-controls">
+                        <div class="sh-control">
+                            <span>Alarma Perimetral</span>
+                            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="sh-control">
+                            <span>Modo Nocturno</span>
+                            <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="sh-control">
+                            <span>Alertas por Email</span>
+                            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="sh-control">
+                            <span>Detección RF</span>
+                            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="sh-control">
+                            <span>Grabación Cámaras</span>
+                            <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="sh-control">
+                            <span>Sirena</span>
+                            <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+                        </div>
+                    </div>
+                </div>
+                <!-- Activity log -->
+                <div class="card sh-activity-card">
+                    <div class="card-header"><h3>📝 Actividad Reciente</h3></div>
+                    <div class="sh-activity" id="sh-activity">
+                        <div class="sh-event"><span class="sh-event-time">10:42</span><span class="sh-event-text">Presencia detectada en <strong>Living</strong></span></div>
+                        <div class="sh-event"><span class="sh-event-time">10:38</span><span class="sh-event-text">Movimiento en <strong>Dormitorio</strong></span></div>
+                        <div class="sh-event"><span class="sh-event-time">10:30</span><span class="sh-event-text">Alarma perimetral activada</span></div>
+                        <div class="sh-event"><span class="sh-event-time">10:15</span><span class="sh-event-text">Sistema iniciado correctamente</span></div>
+                        <div class="sh-event"><span class="sh-event-time">09:45</span><span class="sh-event-text">Área <strong>Living</strong> sin presencia</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+    <!-- END PAGE: Smart Home -->
+
+    <!-- ─── PAGE: Terminal ─── -->
+    <div class="page" id="page-terminal">
+        <section class="terminal-section">
+            <div class="card" style="height:calc(100vh - 100px)">
+                <iframe src="console.html" style="width:100%;height:100%;border:none;border-radius:var(--radius)"></iframe>
+            </div>
+        </section>
+    </div>
+    <!-- END PAGE: Terminal -->
+
+    <!-- ─── PAGE: Settings (moved from sidebar) ─── -->
+    <div class="page" id="page-settings">
 
         <div class="settings-content">
             <!-- Detección -->
@@ -345,10 +523,14 @@
                     <span>Servidor:</span><span id="info-server">--</span>
                 </div>
             </div>
+            </div>
         </div>
-    </aside>
+    </div>
+    <!-- END PAGE: Settings -->
 
-    <!-- ─── Overlay for Settings ───────────────────────── -->
+    </main>
+
+    <!-- ─── Overlay for Settings ─── -->
     <div class="settings-overlay" id="settings-overlay"></div>
 
     <!-- ─── Fullscreen Modal ───────────────────────────── -->

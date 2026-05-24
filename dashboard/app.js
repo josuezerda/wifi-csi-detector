@@ -1,7 +1,41 @@
 /**
- * WiFi CSI Presence Detector — Dashboard App
- * Visualización en tiempo real de datos CSI con Chart.js y Canvas
+ * Spectra — Plataforma de Percepción Espacial
+ * Dashboard con detección RF, cámaras, control home y terminal
  */
+
+// ═══════════════════════════════════════════════════════════
+// Page Navigation
+// ═══════════════════════════════════════════════════════════
+
+const PAGE_TITLES = {
+    detection: 'Detección RF',
+    cameras: 'Cámaras de Seguridad',
+    smarthome: 'Control Home',
+    terminal: 'Terminal en Vivo',
+    settings: 'Configuración',
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const navItems = document.querySelectorAll('.nav-item[data-page]');
+    navItems.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const page = btn.dataset.page;
+            // Update nav active state
+            navItems.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Show/hide pages
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            const target = document.getElementById('page-' + page);
+            if (target) target.classList.add('active');
+            // Update header title
+            const titleEl = document.getElementById('page-title');
+            if (titleEl) titleEl.textContent = PAGE_TITLES[page] || page;
+            // Show/hide mode toggle (only on detection page)
+            const modeToggle = document.getElementById('mode-toggle');
+            if (modeToggle) modeToggle.style.display = page === 'detection' ? '' : 'none';
+        });
+    });
+});
 
 // ═══════════════════════════════════════════════════════════
 // Configuración
