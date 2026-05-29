@@ -1794,25 +1794,30 @@ async function loadCameras() {
         return;
     }
 
-    grid.innerHTML = cameras.map(cam => `
+    grid.innerHTML = cameras.map(cam => {
+        const snapHtml = cam.snapshot_url
+            ? `<img src="${cam.snapshot_url}" alt="${cam.name}" style="width:100%;height:200px;object-fit:cover;border-radius:8px;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+            : '';
+        return `
         <div class="card camera-card">
             <div class="card-header">
                 <h3>📷 ${cam.name}</h3>
                 <span class="badge ${cam.is_active ? 'badge-live' : ''}">${cam.is_active ? '● ONLINE' : 'OFFLINE'}</span>
             </div>
             <div class="camera-feed">
-                <div class="camera-placeholder">
+                ${snapHtml}
+                <div class="camera-placeholder" style="${cam.snapshot_url ? 'display:none' : 'display:flex'}">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                     <p>${cam.location || 'Sin ubicación'}</p>
-                    <span class="camera-url">${cam.rtsp_url || 'Sin RTSP'}</span>
+                    <span class="camera-url">Esperando snapshot...</span>
                 </div>
             </div>
             <div class="camera-info" style="display:flex;justify-content:space-between;align-items:center">
                 <span>IP: <strong>${cam.rtsp_url ? cam.rtsp_url.match(/@([\d.]+)/)?.[1] || '—' : '—'}</strong></span>
                 <button onclick="deleteCamera('${cam.id}')" style="background:var(--accent-red-dim);color:var(--accent-red);border:none;padding:4px 10px;border-radius:6px;font-size:0.7rem;cursor:pointer;font-weight:600">Eliminar</button>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 async function handleAddCamera(e) {

@@ -363,6 +363,58 @@ def heartbeat_loop(cameras_count_fn):
             time.sleep(1)
 
 
+def snapshot_loop(processors_fn):
+    """Thread loop que captura snapshots de cada cámara y los sube a Supabase."""
+    time.sleep(15)  # Esperar a que las cámaras conecten
+    while running:
+        try:
+            processors = processors_fn()
+            for proc in processors:
+                if not running:
+                    break
+                try:
+                    if proc.cap and proc.cap.isOpened():
+                        ret, frame = proc.cap.read()
+                        if ret and frame is not None:
+                            # Resize para ahorrar ancho de banda
+                            h, w = frame.shape[:2]
+                            scale = min(640 / w, 480 / h)
+                            if scale < 1:
+                                frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
+                            
+                            _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                            cam_id = proc.camera.get('id', 'unknown')
+                            path = f"{cam_id}.jpg"
+                            
+                            headers = {
+                                **supabase_headers(),
+                                "Content-Type": "image/jpeg",
+                                "x-upsert": "true",
+                            }
+                            
+                            requests.post(
+                                f"{SUPABASE_URL}/storage/v1/object/camera-snapshots/{path}",
+                                data=buf.tobytes(),
+                                headers=headers,
+                                timeout=10,
+                            )
+                            
+                            snap_url = f"{SUPABASE_URL}/storage/v1/object/public/camera-snapshots/{path}?t={int(time.time())}"
+                            requests.patch(
+                                f"{SUPABASE_URL}/rest/v1/home_cameras?id=eq.{cam_id}",
+                                json={"snapshot_url": snap_url},
+                                headers={**supabase_headers(), "Content-Type": "application/json"},
+                                timeout=5,
+                            )
+                except Exception as e:
+                    pass  # Silently skip failed snapshots
+        except Exception:
+            pass
+        
+        for _ in range(30):
+            if not running:
+                break
+            time.sleep(1)
 class CameraProcessor:
     """Procesa frames de una cámara: detección facial + celular."""
     
@@ -659,6 +711,15 @@ def main():
     )
     hb_thread.start()
     print("💓 Heartbeat activo (cada 30s)")
+    
+    # Iniciar thread de snapshots
+    snap_thread = threading.Thread(
+        target=snapshot_loop,
+        args=(lambda: processors,),
+        daemon=True
+    )
+    snap_thread.start()
+    print("📸 Snapshots activos (cada 30s)")
     
     if not cameras:
         print("⚠️  No hay cámaras configuradas. Agregá cámaras desde el dashboard web.")
