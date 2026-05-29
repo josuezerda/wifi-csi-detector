@@ -583,27 +583,32 @@ class CameraProcessor:
         
         now = time.time()
         
-        # Usar la persona más grande (más cercana a la cámara)
+        # Usar la persona más grande (más cercana)
         person = max(person_bottoms, key=lambda p: p['height'])
         bottom_y = person['bottom']
         person_h = person['height']
         
-        # Guardar historial de posiciones (últimos 15 frames ~30 seg)
+        # Guardar historial
         self.person_history_y.append({'y': bottom_y, 't': now, 'h': person_h})
-        if len(self.person_history_y) > 15:
+        if len(self.person_history_y) > 30:
             self.person_history_y.pop(0)
         
-        # Necesitamos al menos 5 frames para tener baseline
-        if len(self.person_history_y) < 5:
+        n = len(self.person_history_y)
+        print(f"  📐 Comedor jump: frame={n} bottom_y={bottom_y:.0f} height={person_h:.0f}")
+        
+        # Necesitamos al menos 3 frames
+        if n < 3:
             return
         
-        # Baseline = promedio de las posiciones más bajas (piso)
-        sorted_y = sorted([p['y'] for p in self.person_history_y], reverse=True)
-        baseline = sum(sorted_y[:3]) / 3  # promedio de las 3 posiciones más bajas (pies en piso)
+        # Baseline = el bottom_y más alto de los últimos frames (cuando está parado en el piso)
+        # En la imagen, Y más grande = más abajo. Piso = Y grande, salto = Y más chico
+        max_y = max(p['y'] for p in self.person_history_y)  # posición en el piso
         
-        # Un salto = los pies suben más del 15% de la altura de la persona
-        threshold = person_h * 0.15
-        elevation = baseline - bottom_y  # positivo = persona subió
+        # Elevación = cuánto subió respecto al piso
+        elevation = max_y - bottom_y
+        threshold = person_h * 0.10  # 10% de la altura = salto
+        
+        print(f"  📐 Comedor jump: baseline={max_y:.0f} elevation={elevation:.0f} threshold={threshold:.0f}")
         
         if elevation > threshold and now - self.jump_cooldown > 30:
             hora = datetime.now(TIMEZONE_AR).strftime('%H:%M:%S')
@@ -613,7 +618,6 @@ class CameraProcessor:
             msg = f"🦘 ¡SALTO detectado en {self.name}!\n📏 Elevación: {elevation:.0f}px\n🕐 Hora: {hora}"
             send_whatsapp_alert(msg)
             self.jump_cooldown = now
-            # Reset historial después de detectar salto
             self.person_history_y = []
     
     def _handle_person_detection(self, count):
@@ -797,26 +801,43 @@ def main():
     print("🚀 Iniciando procesamiento de cámaras...")
     print("-" * 60)
     
-    # Recargar personas cada 5 minutos
-    os.makedirs("/home/pi/control-home/snapshots", exist_ok=True)
     last_reload = time.time()
     
+    # Separar Comedor (tiempo real) del resto
+    comedor_proc = None
+    other_processors = []
+    for proc in processors:
+        if "Comedor" in proc.name:
+            comedor_proc = proc
+            print(f"  🦘 {proc.name}: Modo TIEMPO REAL (cada 0.5s)")
+        else:
+            other_processors.append(proc)
+    
+    # Thread dedicado para Comedor (tiempo real)
+    def comedor_realtime_loop():
+        """Procesa Comedor a alta velocidad para detección de saltos."""
+        while running:
+            try:
+                frame = comedor_proc.grab_frame()
+                if frame is not None:
+                    comedor_proc.detect_yolo(frame)
+                    comedor_proc.detect_faces(frame)
+            except Exception as e:
+                print(f"  ❌ Error Comedor RT: {e}")
+            time.sleep(0.5)  # 2 FPS - tiempo real
+    
+    if comedor_proc:
+        rt_thread = threading.Thread(target=comedor_realtime_loop, daemon=True)
+        rt_thread.start()
+        print(f"  ✅ Comedor en hilo dedicado a 2 FPS")
+    
     while running:
-        for proc in processors:
+        for proc in other_processors:
             if not running:
                 break
             
             frame = proc.grab_frame()
             if frame is not None:
-                # Save snapshot for preview server
-                try:
-                    import re as _re
-                    _m = _re.search(r"@(\d+\.\d+\.\d+\.\d+)", proc.rtsp_url)
-                    if _m:
-                        _ip = _m.group(1)
-                        cv2.imwrite(f"/home/pi/control-home/snapshots/{_ip}.jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                except Exception:
-                    pass
                 proc.detect_faces(frame)
                 proc.detect_yolo(frame)
         
