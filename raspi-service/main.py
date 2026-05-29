@@ -381,11 +381,26 @@ class CameraProcessor:
         self._load_yolo()
     
     def _load_yolo(self):
-        """Carga modelo YOLOv8-nano para detección de celulares."""
+        """Carga modelo YOLOv8-nano optimizado (NCNN > EdgeTPU > PyTorch)."""
         try:
             from ultralytics import YOLO
-            self.yolo_model = YOLO("yolov8n.pt")
-            print(f"  🤖 {self.name}: YOLOv8-nano cargado")
+            import os
+            base = os.path.dirname(os.path.abspath(__file__))
+            
+            # Prioridad: NCNN (ARM optimizado) > Edge TPU (Coral) > PyTorch
+            ncnn_path = os.path.join(base, "yolov8n_ncnn_model")
+            edgetpu_path = os.path.join(base, "yolov8n_full_integer_quant_edgetpu.tflite")
+            pt_path = os.path.join(base, "yolov8n.pt")
+            
+            if os.path.isdir(ncnn_path):
+                self.yolo_model = YOLO(ncnn_path)
+                print(f"  🚀 {self.name}: YOLOv8n NCNN cargado (ARM acelerado)")
+            elif os.path.exists(edgetpu_path):
+                self.yolo_model = YOLO(edgetpu_path)
+                print(f"  🪸 {self.name}: YOLOv8n Edge TPU cargado (Google Coral)")
+            else:
+                self.yolo_model = YOLO(pt_path)
+                print(f"  🤖 {self.name}: YOLOv8n PyTorch cargado (CPU)")
         except ImportError:
             print(f"  ⚠️  {self.name}: ultralytics no instalado. Sin detección de celular.")
         except Exception as e:
