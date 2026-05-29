@@ -1796,7 +1796,7 @@ async function loadCameras() {
 
     grid.innerHTML = cameras.map(cam => {
         const snapHtml = cam.snapshot_url
-            ? `<img src="${cam.snapshot_url}" alt="${cam.name}" style="width:100%;height:200px;object-fit:cover;border-radius:8px;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+            ? `<img src="${cam.snapshot_url}" alt="${cam.name}" style="width:100%;height:auto;max-height:280px;object-fit:contain;border-radius:8px;display:block;background:#000" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
             : '';
         return `
         <div class="card camera-card">
@@ -1818,6 +1818,16 @@ async function loadCameras() {
             </div>
         </div>`;
     }).join('');
+
+    // Auto-refresh snapshots cada 15 seg
+    if (window._snapInterval) clearInterval(window._snapInterval);
+    window._snapInterval = setInterval(() => {
+        const imgs = document.querySelectorAll('.camera-feed img');
+        imgs.forEach(img => {
+            const base = img.src.split('?')[0];
+            img.src = base + '?t=' + Date.now();
+        });
+    }, 15000);
 }
 
 async function handleAddCamera(e) {
