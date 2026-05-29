@@ -430,10 +430,11 @@ class CameraProcessor:
         self.phone_sessions = {}  # camera_name -> {start: timestamp, last_seen: timestamp}
         self.reconnect_delay = 5
         self.yolo_model = None
-        # Jump detection state
-        self.person_baseline_y = {}   # person_idx -> baseline bottom_y (piso)
-        self.person_history_y = []    # últimas N posiciones bottom_y
+        # Jump detection state (motion energy)
+        self.prev_frame_gray = None   # frame anterior en gris
+        self.motion_history = []      # últimas N energías de movimiento
         self.jump_cooldown = 0        # timestamp última alerta de salto
+        self.person_history_y = []    # legacy, no usado
         self._load_yolo()
     
     def _load_yolo(self):
@@ -479,14 +480,21 @@ class CameraProcessor:
             return False
     
     def grab_frame(self):
-        """Captura un frame de la cámara."""
+        """Captura un frame de la cámara (flush buffer RTSP)."""
         if not self.cap or not self.cap.isOpened():
             if not self.connect():
                 time.sleep(self.reconnect_delay)
                 self.reconnect_delay = min(60, self.reconnect_delay * 2)
                 return None
         
-        ret, frame = self.cap.read()
+        # Flush buffer RTSP — descartar frames viejos para obtener el actual
+        for _ in range(3):
+            self.cap.grab()
+        
+        ret, frame = self.cap.retrieve()
+        if not ret:
+            # Fallback a read() normal
+            ret, frame = self.cap.read()
         if not ret:
             print(f"  ⚠️  {self.name}: Frame perdido, reconectando...")
             self.cap.release()
@@ -508,6 +516,40 @@ class CameraProcessor:
             locations = face_recognition.face_locations(rgb_small, model="hog")
             if locations:
                 print(f"  👁️  {self.name}: {len(locations)} cara(s) detectada(s)")
+            
+            # Jump detection por posición de cara (solo Comedor)
+            if "Comedor" in self.name and locations:
+                # face_locations devuelve (top, right, bottom, left) en la imagen reducida
+                # Multiplicamos x2 para coordenadas reales
+                top, right, bottom, left = locations[0]
+                face_center_y = (top + bottom) * 1.0  # x2 ya incluido al ser centro
+                face_height = (bottom - top) * 2.0
+                
+                now = time.time()
+                self.person_history_y.append({'y': face_center_y, 't': now, 'h': face_height})
+                if len(self.person_history_y) > 30:
+                    self.person_history_y.pop(0)
+                
+                n = len(self.person_history_y)
+                
+                if n >= 3:
+                    # Baseline = posición más baja de la cara (Y más grande = más abajo en imagen)
+                    max_y = max(p['y'] for p in self.person_history_y)
+                    elevation = max_y - face_center_y
+                    threshold = face_height * 0.3  # 30% de la altura de la cara
+                    
+                    print(f"  📐 Comedor: cara_y={face_center_y:.0f} base={max_y:.0f} elev={elevation:.0f} umbral={threshold:.0f}")
+                    
+                    if elevation > threshold and now - self.jump_cooldown > 30:
+                        hora = datetime.now(TIMEZONE_AR).strftime('%H:%M:%S')
+                        print(f"  🦘 {self.name}: ¡SALTO DETECTADO! Elevación: {elevation:.0f}px")
+                        send_event("jump_detected", f"Salto detectado ({elevation:.0f}px)", self.name,
+                                   confidence=None, person_id=None, is_known=True)
+                        msg = f"🦘 ¡SALTO detectado en {self.name}!\n📏 Elevación: {elevation:.0f}px\n🕐 Hora: {hora}"
+                        send_whatsapp_alert(msg)
+                        self.jump_cooldown = now
+                        self.person_history_y = []
+            
             encodings = face_recognition.face_encodings(rgb_small, locations)
             
             for encoding in encodings:
@@ -574,51 +616,54 @@ class CameraProcessor:
         except Exception as e:
             print(f"  ❌ Error en detección YOLO: {e}")
     
-    def _detect_jump(self, person_bottoms, frame_height):
-        """Detecta saltos analizando movimiento vertical del bounding box. Solo en Comedor."""
+    def detect_jump_motion(self, frame):
+        """Detecta saltos por energía de movimiento entre frames. Solo en Comedor."""
         if "Comedor" not in self.name:
             return
-        if not person_bottoms:
+        
+        # Convertir a gris y reducir
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.resize(gray, (320, 240))
+        gray = cv2.GaussianBlur(gray, (21, 21), 0)
+        
+        if self.prev_frame_gray is None:
+            self.prev_frame_gray = gray
             return
+        
+        # Diferencia entre frames
+        diff = cv2.absdiff(self.prev_frame_gray, gray)
+        motion_energy = float(diff.mean())  # promedio de cambio por pixel
+        self.prev_frame_gray = gray
         
         now = time.time()
+        self.motion_history.append({'e': motion_energy, 't': now})
         
-        # Usar la persona más grande (más cercana)
-        person = max(person_bottoms, key=lambda p: p['height'])
-        bottom_y = person['bottom']
-        person_h = person['height']
+        # Mantener últimos 60 registros (~30 seg)
+        if len(self.motion_history) > 60:
+            self.motion_history.pop(0)
         
-        # Guardar historial
-        self.person_history_y.append({'y': bottom_y, 't': now, 'h': person_h})
-        if len(self.person_history_y) > 30:
-            self.person_history_y.pop(0)
+        n = len(self.motion_history)
         
-        n = len(self.person_history_y)
-        print(f"  📐 Comedor jump: frame={n} bottom_y={bottom_y:.0f} height={person_h:.0f}")
+        # Calcular promedio de movimiento (excluir el actual)
+        if n >= 5:
+            avg_motion = sum(p['e'] for p in self.motion_history[:-1]) / (n - 1)
+        else:
+            avg_motion = motion_energy
         
-        # Necesitamos al menos 3 frames
-        if n < 3:
-            return
+        # Un salto genera un pico de movimiento mucho mayor al promedio
+        # Mínimo 3.0 de energía para no disparar con ruido de imagen
+        is_spike = motion_energy > max(avg_motion * 2.5, 3.0)
         
-        # Baseline = el bottom_y más alto de los últimos frames (cuando está parado en el piso)
-        # En la imagen, Y más grande = más abajo. Piso = Y grande, salto = Y más chico
-        max_y = max(p['y'] for p in self.person_history_y)  # posición en el piso
+        print(f"  📐 Comedor: energia={motion_energy:.1f} avg={avg_motion:.1f} spike={'🔴' if is_spike else '⚪'}")
         
-        # Elevación = cuánto subió respecto al piso
-        elevation = max_y - bottom_y
-        threshold = person_h * 0.10  # 10% de la altura = salto
-        
-        print(f"  📐 Comedor jump: baseline={max_y:.0f} elevation={elevation:.0f} threshold={threshold:.0f}")
-        
-        if elevation > threshold and now - self.jump_cooldown > 30:
+        if is_spike and now - self.jump_cooldown > 15:
             hora = datetime.now(TIMEZONE_AR).strftime('%H:%M:%S')
-            print(f"  🦘 {self.name}: ¡SALTO DETECTADO! Elevación: {elevation:.0f}px")
-            send_event("jump_detected", f"Salto detectado ({elevation:.0f}px)", self.name,
+            print(f"  🦘 {self.name}: ¡SALTO DETECTADO! Energía: {motion_energy:.1f} (avg: {avg_motion:.1f})")
+            send_event("jump_detected", f"Movimiento brusco ({motion_energy:.1f})", self.name,
                        confidence=None, person_id=None, is_known=True)
-            msg = f"🦘 ¡SALTO detectado en {self.name}!\n📏 Elevación: {elevation:.0f}px\n🕐 Hora: {hora}"
+            msg = f"🦘 ¡SALTO detectado en {self.name}!\n💥 Intensidad: {motion_energy:.1f}\n🕐 Hora: {hora}"
             send_whatsapp_alert(msg)
             self.jump_cooldown = now
-            self.person_history_y = []
     
     def _handle_person_detection(self, count):
         """Maneja detección de personas por YOLO."""
@@ -630,9 +675,6 @@ class CameraProcessor:
             print(f"  🚶 {self.name}: {count} persona(s) detectada(s) por YOLO")
             send_event("person_detected", f"{count} persona(s)", self.name, 
                        confidence=None, person_id=None, is_known=True)
-            hora = datetime.now(TIMEZONE_AR).strftime('%H:%M:%S')
-            msg = f"🚶 Persona detectada en {self.name}\n👥 Cantidad: {count}\n🕐 Hora: {hora}"
-            send_whatsapp_alert(msg)
             self.last_detection[key] = now
     
     def _handle_phone_detection(self, detected):
@@ -820,11 +862,10 @@ def main():
             try:
                 frame = comedor_proc.grab_frame()
                 if frame is not None:
-                    comedor_proc.detect_yolo(frame)
-                    comedor_proc.detect_faces(frame)
+                    comedor_proc.detect_jump_motion(frame)
             except Exception as e:
                 print(f"  ❌ Error Comedor RT: {e}")
-            time.sleep(0.5)  # 2 FPS - tiempo real
+            time.sleep(0.3)  # ~3 FPS
     
     if comedor_proc:
         rt_thread = threading.Thread(target=comedor_realtime_loop, daemon=True)
