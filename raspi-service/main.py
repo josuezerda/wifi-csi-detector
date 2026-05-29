@@ -430,6 +430,10 @@ class CameraProcessor:
         self.phone_sessions = {}  # camera_name -> {start: timestamp, last_seen: timestamp}
         self.reconnect_delay = 5
         self.yolo_model = None
+        # Jump detection state
+        self.person_baseline_y = {}   # person_idx -> baseline bottom_y (piso)
+        self.person_history_y = []    # últimas N posiciones bottom_y
+        self.jump_cooldown = 0        # timestamp última alerta de salto
         self._load_yolo()
     
     def _load_yolo(self):
@@ -536,11 +540,14 @@ class CameraProcessor:
             return
         
         try:
+            h_orig, w_orig = frame.shape[:2]
             small = cv2.resize(frame, (416, 416))
+            scale_y = h_orig / 416.0
             results = self.yolo_model(small, verbose=False, conf=0.35)
             
             phone_detected = False
             person_count = 0
+            person_bottoms = []  # bottom Y de cada persona (en px originales)
             
             for result in results:
                 for box in result.boxes:
@@ -548,6 +555,12 @@ class CameraProcessor:
                     conf = float(box.conf[0])
                     if cls_id == 0:  # person
                         person_count += 1
+                        # Obtener coordenadas del bounding box
+                        x1, y1, x2, y2 = box.xyxy[0].tolist()
+                        bottom_y = y2 * scale_y  # posición de los pies
+                        top_y = y1 * scale_y      # posición de la cabeza
+                        height = (y2 - y1) * scale_y  # altura de la persona
+                        person_bottoms.append({'bottom': bottom_y, 'top': top_y, 'height': height})
                     elif cls_id == 67:  # cell phone
                         phone_detected = True
             
@@ -555,8 +568,53 @@ class CameraProcessor:
             self._handle_person_detection(person_count)
             self._handle_phone_detection(phone_detected)
             
+            # Jump detection
+            self._detect_jump(person_bottoms, h_orig)
+            
         except Exception as e:
             print(f"  ❌ Error en detección YOLO: {e}")
+    
+    def _detect_jump(self, person_bottoms, frame_height):
+        """Detecta saltos analizando movimiento vertical del bounding box. Solo en Comedor."""
+        if "Comedor" not in self.name:
+            return
+        if not person_bottoms:
+            return
+        
+        now = time.time()
+        
+        # Usar la persona más grande (más cercana a la cámara)
+        person = max(person_bottoms, key=lambda p: p['height'])
+        bottom_y = person['bottom']
+        person_h = person['height']
+        
+        # Guardar historial de posiciones (últimos 15 frames ~30 seg)
+        self.person_history_y.append({'y': bottom_y, 't': now, 'h': person_h})
+        if len(self.person_history_y) > 15:
+            self.person_history_y.pop(0)
+        
+        # Necesitamos al menos 5 frames para tener baseline
+        if len(self.person_history_y) < 5:
+            return
+        
+        # Baseline = promedio de las posiciones más bajas (piso)
+        sorted_y = sorted([p['y'] for p in self.person_history_y], reverse=True)
+        baseline = sum(sorted_y[:3]) / 3  # promedio de las 3 posiciones más bajas (pies en piso)
+        
+        # Un salto = los pies suben más del 15% de la altura de la persona
+        threshold = person_h * 0.15
+        elevation = baseline - bottom_y  # positivo = persona subió
+        
+        if elevation > threshold and now - self.jump_cooldown > 30:
+            hora = datetime.now(TIMEZONE_AR).strftime('%H:%M:%S')
+            print(f"  🦘 {self.name}: ¡SALTO DETECTADO! Elevación: {elevation:.0f}px")
+            send_event("jump_detected", f"Salto detectado ({elevation:.0f}px)", self.name,
+                       confidence=None, person_id=None, is_known=True)
+            msg = f"🦘 ¡SALTO detectado en {self.name}!\n📏 Elevación: {elevation:.0f}px\n🕐 Hora: {hora}"
+            send_whatsapp_alert(msg)
+            self.jump_cooldown = now
+            # Reset historial después de detectar salto
+            self.person_history_y = []
     
     def _handle_person_detection(self, count):
         """Maneja detección de personas por YOLO."""
@@ -564,11 +622,12 @@ class CameraProcessor:
         key = f"person_{self.name}"
         last = self.last_detection.get(key, 0)
         
-        if count > 0 and now - last > 300:
+        if count > 0 and now - last > 60:
             print(f"  🚶 {self.name}: {count} persona(s) detectada(s) por YOLO")
             send_event("person_detected", f"{count} persona(s)", self.name, 
                        confidence=None, person_id=None, is_known=True)
-            msg = f"Persona detectada en {self.name} - Cantidad: {count} - Hora: {datetime.now(TIMEZONE_AR).strftime(chr(37)+chr(72)+chr(58)+chr(37)+chr(77)+chr(58)+chr(37)+chr(83))}"
+            hora = datetime.now(TIMEZONE_AR).strftime('%H:%M:%S')
+            msg = f"🚶 Persona detectada en {self.name}\n👥 Cantidad: {count}\n🕐 Hora: {hora}"
             send_whatsapp_alert(msg)
             self.last_detection[key] = now
     
